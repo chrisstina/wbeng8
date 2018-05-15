@@ -2,6 +2,7 @@ const provider = require('../sabre'),
     scbsKit = require('../../../utils/scbsKit'),
     currency = require('../../../utils/scbsCurrency'),
     customTax = require('../../../utils/scbsCustomTax'),
+    errors = require('request-promise-native/errors'),
     xmljs = require('libxmljs');
 
 var SabreFlights = function () {
@@ -18,6 +19,7 @@ var SabreFlights = function () {
 SabreFlights.prototype.execute = function (context, parameters, profileConfig) {
     console.info('Токен запроса %s', context.WBtoken);
     console.time("Sabre flights executed in");
+
     return openSession(profileConfig, parameters)
         .then((sessionToken) => {
             return sessionToken;
@@ -29,7 +31,7 @@ SabreFlights.prototype.execute = function (context, parameters, profileConfig) {
             return closeSession(profileConfig, parameters, sessionToken);
         })
         .catch((err) => {
-            console.error(err.toString(), err.stack);
+            console.log(err instanceof errors.TransformError); // значит, это ошибка парсинга
             console.timeEnd("Sabre flights executed in");
             return err;
         });
@@ -67,7 +69,7 @@ let getFlights = function (profileConfig, parameters, sessionToken) {
  * @param {type} body ответ raw XML
  */
 let parseSessionResponse = function (body) {
-    return xmljs.parseXml(body).get('//wsse:BinarySecurityToken', provider.nsUri).text();
+    return body.get('//wsse:BinarySecurityToken', provider.nsUri).text();
 };
 
 let closeSession = function (profileConfig, parameters, context, token) {
@@ -91,9 +93,9 @@ let buildFlightsRequest = function (profileConfig, parameters) {
 
     cursor = xmlDoc.node('OTA_AirLowFareSearchRQ').attr({
         Target: 'Production',
-        Version: '3.0.0',
+        Version: '3.4.0',
         ResponseType: 'OTA',
-        ResponseVersion: '3.0.0',
+        ResponseVersion: '3.4.0',
         xmlns: 'http://www.opentravel.org/OTA/2003/05',
         AvailableFlightsOnly: true
     });
@@ -170,9 +172,8 @@ let buildFlightsRequest = function (profileConfig, parameters) {
     return xmlDoc;
 };
 
-let parseFlightsResponse = function (body, profileConfig, parameters) {
-    let xmlDoc = xmljs.parseXml(body),
-        isDiscounted = false,
+let parseFlightsResponse = function (xmlDoc, profileConfig, parameters) {
+    let isDiscounted = false,
         timezone = provider.getPCCTimezone(profileConfig);
 
     parameters.seats.map(function (seat) {

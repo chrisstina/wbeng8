@@ -1,5 +1,4 @@
 const restify = require('restify')
-    errors = require('restify-errors'),
     config = require('./config.js'),
     env = require('./utils/environment')(), // определяем окружение
     operationModule = new require('./core/operation')(),
