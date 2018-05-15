@@ -1,0 +1,25 @@
+{
+  "name": "wbeng8-restify",
+  "version": "1.0.0",
+  "description": "wbeng REST API with node 8 and restify",
+  "main": "app.js",
+  "scripts": {
+    "test": "test"
+  },
+  "keywords": [
+    "wbeng",
+    "api"
+  ],
+  "author": "chriss",
+  "license": "ISC",
+  "dependencies": {
+    "bunyan": "^1.8.12",
+    "crypto": "^1.0.1",
+    "ip": "^1.1.5",
+    "libxmljs": "^0.18.8",
+    "request": "^2.85.0",
+    "request-promise-native": "^1.0.5",
+    "restify": "^7.1.1",
+    "restify-errors": "^6.0.0"
+  }
+}

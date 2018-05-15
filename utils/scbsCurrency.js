@@ -1,0 +1,113 @@
+var DECIMAL_POINTS = 8;// количество знаков после запятой для курса валюты
+
+var scbsCurrency = (function() {
+    var self;
+
+    function scbsCurrency() {
+        self = this;
+    }
+
+    /**
+     * @param currencyIn
+     * @param currencyOut
+     */
+    scbsCurrency.prototype.getRate = function(currencyIn, currencyOut) {
+        return 1;
+
+        if (currencyOut === undefined) {
+            currencyOut = 'RUB';
+        }
+
+        if (currencyIn === currencyOut) {
+            return 1;
+        }
+
+        var allRates = cache.get('all-rates');
+        if (allRates === undefined) {
+            throw Error('Failed to retrieve rate data from CBR service.');
+        }
+
+        var rate = calculateRawRate(allRates, currencyIn, currencyOut);
+        if (rate !== undefined) {
+            return parseFloat(rate.toFixed(DECIMAL_POINTS));
+        } else {
+            log.debug('Could not retrieve rate for currency %s, %s', currencyIn, currencyOut);
+            throw Error('Could not retrieve rate for ' + currencyIn + ' / ' + currencyOut);
+        }
+    };
+
+    /**
+     * Конвертирует сумму в указанную валюту
+     * @param amount
+     * @param currencyIn
+     * @param currencyOut
+     * @param fixedRate
+     * @param provider
+     * @param operation
+     * @param pnr
+     * @param priceType
+     * @returns {number | *}
+     */
+    scbsCurrency.prototype.convertAmount = function(amount, currencyIn, currencyOut, fixedRate, provider, operation, pnr, priceType) {
+        var rate, finalAmount, isHistorical = (fixedRate !== undefined && fixedRate !== null);
+        var skipLog = (operation === 'flights' || provider === '1G' || provider === '2G' || currencyIn === 'RUB');
+        if ( ! isHistorical || fixedRate === null) {
+            rate = self.getRate(currencyIn, currencyOut);
+        } else {
+            rate = fixedRate;
+            log.info('Converted from %s to RUB with historical rate %s', currencyIn, fixedRate);
+        }
+
+        finalAmount = parseFloat((amount * rate).toFixed(DECIMAL_POINTS));
+
+        if ( ! skipLog) {
+            currencyLog.debug('%s %s %s converted to %s RUB, %s-RUB %s rate is %s (operation %s, provider %s, order %s, type of price: %s)',
+                priceType, amount, currencyIn, finalAmount, currencyIn, (isHistorical ? 'history' : 'current'), rate, operation, provider, pnr, priceType
+            );
+        }
+        return finalAmount;
+    };
+
+    let calculateRawRate = function(allRates, currencyIn, currencyOut) {
+        if (currencyIn === 'RUB' || currencyOut === 'RUB') {
+            var altCurrency = (currencyIn === 'RUB') ? currencyOut : currencyIn,  // к какой валюте ищем курс
+                rateToRUB = getRateRUB(altCurrency, allRates);// курс XXX|RUB
+
+            if (currencyOut === 'RUB') {
+                return rateToRUB;  // XXX|RUB - сколько будет в рублях рублей сумма в XXX?
+            } else {
+                return 1 / rateToRUB; // RUB|XXX - сколько будет в ХХХ сумма в рублях?
+            }
+        } else { // кросс-курсы
+            var inToRUB = getRateRUB(currencyIn, allRates),
+                outToRUB = getRateRUB(currencyOut, allRates);
+            return (1/outToRUB) / (1 / inToRUB);
+        }
+    };
+
+    /**
+     * Возвращает курс к рублю
+     * @param {type} currencyIn
+     * @param {type} allRates
+     * @returns {unresolved}
+     */
+    let getRateRUB = function(currencyIn, allRates) {
+        if (currencyIn === undefined) {
+            log.debug('Undefined currency');
+            return 1; // если что-то пошло не так, возвращаем  курс RUB|RUB
+        }
+
+        var rate = allRates[currencyIn.toLowerCase()];
+        if ( rate !== undefined ) {
+            return parseFloat((rate.value / rate.par).toFixed(DECIMAL_POINTS)); // курс XXX|RUB
+        } else {
+            log.debug('Could not retrieve rate for currency %s', currencyIn);
+            throw Error('Could not retrieve rate for ' + currencyIn);
+        }
+    };
+
+    return new scbsCurrency();
+})();
+
+module.exports = scbsCurrency;
+
