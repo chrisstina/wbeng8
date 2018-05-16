@@ -8,9 +8,9 @@ module.exports = function (server, profileModule, operationsModule) {
 
     server.get('/flights', (req, res, next) => {
         try {
-            let providerName = config['providers'][req.params.context.provider];
-            let operation = operationsModule.getProviderOperation(providerName, 'flights');
-            let profileConfig = profileModule.getProviderProfile(req.userProfile, providerName);
+            var providerName = config['providers'][req.params.context.provider];
+            var operation = operationsModule.getProviderOperation(providerName, 'flights');
+            var profileConfig = profileModule.getProviderProfile(req.userProfile, providerName);
         } catch (e) {
             next(e);
         }
