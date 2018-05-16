@@ -1,13 +1,16 @@
-const errors = require('restify-errors');
-const config = require('./config');
+const restErrors = require('restify-errors'),
+    requestErrors = require('request-promise-native/errors');
+
+const config = require('./config'),
+    responseFormatter = require('./utils/scbsResponse');
 
 module.exports = function (server, profileModule, operationsModule) {
 
     server.get('/flights', (req, res, next) => {
         try {
-            var providerName = config['providers'][req.params.context.provider];
-            var operation = operationsModule.getProviderOperation(providerName, 'flights');
-            var profileConfig = profileModule.getProviderProfile(req.userProfile, providerName);
+            let providerName = config['providers'][req.params.context.provider];
+            let operation = operationsModule.getProviderOperation(providerName, 'flights');
+            let profileConfig = profileModule.getProviderProfile(req.userProfile, providerName);
         } catch (e) {
             next(e);
         }
@@ -19,11 +22,23 @@ module.exports = function (server, profileModule, operationsModule) {
             profileConfig
         )
         .then((result) => {
-            res.send(result);
-            next();
+            // пропускаем через responseFormatter чтобы привести к ожидаемому формату
+            try {
+                res.send(responseFormatter.response(result));
+                next();
+            } catch (e) {
+                console.error(e);
+                next(new restErrors.InternalServerError());
+            }
         })
         .catch((err) => {
-            next(new errors.InternalServerError('Внутренняя ошибка сервера')); // @todo стандартизировать ошибки
+            try {
+                res.send(responseFormatter.errorResponse(err));
+            } catch (e) {
+                console.error(e);
+            } finally {
+                next(new restErrors.InternalServerError());
+            }
         });
     });
 
@@ -36,7 +51,3 @@ module.exports = function (server, profileModule, operationsModule) {
 
     // @todo добавить остальные
 };
-
-var getProviderOperation = (providerName, operationName) => {
-
-}

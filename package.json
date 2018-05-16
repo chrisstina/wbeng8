@@ -14,9 +14,13 @@
   "license": "ISC",
   "dependencies": {
     "bunyan": "^1.8.12",
+    "clone": "^2.1.1",
     "crypto": "^1.0.1",
     "ip": "^1.1.5",
     "libxmljs": "^0.18.8",
+    "log": "^1.4.0",
+    "moment": "^2.22.1",
+    "moment-timezone": "^0.5.17",
     "request": "^2.85.0",
     "request-promise-native": "^1.0.5",
     "restify": "^7.1.1",

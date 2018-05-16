@@ -22,7 +22,7 @@ const nsUri = {
     'c': 'http://webservices.sabre.com/sabreXML/2011/10',
     'stl': 'http://services.sabre.com/STL/v01',
     'stl16': 'http://webservices.sabre.com/pnrbuilder/v1_16',
-    'nopnr':'http://webservices.sabre.com/sabreXML/2003/07'
+    'nopnr': 'http://webservices.sabre.com/sabreXML/2003/07'
 };
 
 const XMLTemplate =
@@ -51,28 +51,44 @@ const XMLTemplate =
 
 const requestTimeout = 100000;
 
-var SabreProvider = function () {
+const SIPTimezone = '0300'; // GMT +3 для костыля с перелетами SIP
+
+const methLocomotion = { // метод передвижения на сегменте
+    avia: 'AVIA',
+    bus: 'BUS',
+    train: 'TRAIN',
+    taxi: 'TAXI',
+    ship: 'SHIP'
 };
 
-/**
- * Распарсивает XML ответ в нужную структуру.
- * Дополнительно проверяем на наличие ошибок.
- *
- * @param parseCallback
- * @param body
- * @param profileConfig
- * @param parameters
- * @returns {*}
- */
-let parse = (parseCallback, body, profileConfig, parameters) => {
-    let xmlDoc = xmljs.parseXml(body);
-    let errorText = parseError(xmlDoc);
+/*
+* <!-- "Cabin" (optional) Cabin for this leg or segment. -->
+<!--
+Cabin="P" or Cabin="PremiumFirst" is a Premium First class cabin.
+-->
+<!-- Cabin="F" or Cabin="First" is a First class cabin. -->
+<!--
+Cabin="J" or Cabin="PremiumBusiness" is a Premium Business class cabin.
+-->
+<!--
+Cabin="C" or Cabin="Business" is a Business class cabin.
+-->
+<!--
+Cabin="S" or Cabin="PremiumEconomy" is a Premium Economy class cabin.
+-->
+<!--
+Cabin="Y" or Cabin="Economy" is a Economy class cabin.
+-->
+*/
+const serviceClass = {
+    'FIRST': 'F',
+    'PREMIUMBUSINESS': 'J',
+    'BUSINESS': 'C',
+    'PREMIUMECONOMY': 'S',
+    'ECONOMY': 'Y'
+};
 
-    if (errorText !== '') {
-        throw new Error('GDS вернула ошибку ' + errorText);
-    }
-
-    return parseCallback(xmlDoc, profileConfig, parameters);
+var SabreProvider = function () {
 };
 
 /**
@@ -97,7 +113,7 @@ SabreProvider.prototype.request = function (requestBody, parseCallback, profileC
         body: requestBody,
         timeout: requestTimeout,
         transform: (body, response, resolveWithFullResponse) => { // оборачиваем метод трансформации, чтобы были видны parameters и profileConfig
-            return parse(parseCallback, body, response, resolveWithFullResponse);
+            return parse(parseCallback, body, profileConfig, parameters);
         }
     };
 
@@ -141,34 +157,16 @@ SabreProvider.prototype.buildRequest = function (xmlBody, profileConfig, service
 
 SabreProvider.prototype.nsUri = nsUri;
 
-/*
-* <!-- "Cabin" (optional) Cabin for this leg or segment. -->
-<!--
-Cabin="P" or Cabin="PremiumFirst" is a Premium First class cabin.
--->
-<!-- Cabin="F" or Cabin="First" is a First class cabin. -->
-<!--
-Cabin="J" or Cabin="PremiumBusiness" is a Premium Business class cabin.
--->
-<!--
-Cabin="C" or Cabin="Business" is a Business class cabin.
--->
-<!--
-Cabin="S" or Cabin="PremiumEconomy" is a Premium Economy class cabin.
--->
-<!--
-Cabin="Y" or Cabin="Economy" is a Economy class cabin.
--->
-*/
-SabreProvider.prototype.serviceClass = {
-    'FIRST': 'F',
-    'PREMIUMBUSINESS': 'J',
-    'BUSINESS': 'C',
-    'PREMIUMECONOMY': 'S',
-    'ECONOMY': 'Y'
+SabreProvider.prototype.passengerTypes = {
+    adult: {title: 'ADULT', ssrType: 'DOCS'},
+    child: {title: 'CHILD', ssrType: 'DOCS'},
+    youth: {title: 'YOUTH', ssrType: 'DOCS'},
+    senior: {title: 'SENIOR', ssrType: 'DOCS'},
+    infant: {title: 'INFANT', ssrType: 'INFT'},
+    infantseat: {title: 'WSEATINFANT', ssrType: 'DOCS'}
 };
 
-SabreProvider.prototype.seatCode = function (code) {
+SabreProvider.prototype.getSeatCode = function (code) {
     switch (code) {
         case 'ADULT':
             return 'ADT';
@@ -209,13 +207,63 @@ SabreProvider.prototype.seatCode = function (code) {
     }
 };
 
-SabreProvider.prototype.passengerTypes = {
-    adult: {title: "ADULT", ssrType: "DOCS"},
-    child: {title: "CHILD", ssrType: "DOCS"},
-    youth: {title: "YOUTH", ssrType: "DOCS"},
-    senior: {title: "SENIOR", ssrType: "DOCS"},
-    infant: {title: "INFANT", ssrType: "INFT"},
-    infantseat: {title: "WSEATINFANT", ssrType: "DOCS"}
+SabreProvider.prototype.getServiceClass = function (classCode) {
+    let code = serviceClass[classCode];
+    return (code === undefined) ? 'Y' : code;
+};
+
+SabreProvider.prototype.getTitleByCode = function (classCode) {
+    let serviceClassTitles = {
+        P: 'PREMIUM',
+        F: 'FIRST',
+        J: 'BUSINESS',
+        C: 'BUSINESS',
+        D: 'BUSINESS',
+        Z: 'BUSINESS',
+        I: 'BUSINESS',
+        S: 'ECONOMY',
+        Y: 'ECONOMY',
+        B: 'ECONOMY',
+        M: 'ECONOMY',
+        N: 'ECONOMY',
+        H: 'ECONOMY',
+        Q: 'ECONOMY',
+        K: 'ECONOMY',
+        L: 'ECONOMY',
+        U: 'ECONOMY',
+        T: 'ECONOMY',
+        V: 'ECONOMY',
+        W: 'ECONOMY',
+        R: 'ECONOMY',
+        O: 'ECONOMY',
+        X: 'ECONOMY',
+        G: 'ECONOMY',
+        A: 'ECONOMY'
+    };
+    let title = serviceClassTitles[classCode];
+    return (title === undefined) ? 'ECONOMY' : title;
+};
+
+SabreProvider.prototype.getMethLocomotion = function (equipmentCode) {
+    switch (equipmentCode) {
+        case 'TRN':
+        case 'TRAIN':
+            return methLocomotion.train;
+            break;
+        case 'BUS':
+            return methLocomotion.bus;
+            break;
+        case 'LCH':
+            return methLocomotion.ship;
+            break;
+        case 'LMO':
+        case 'RFS':
+            return methLocomotion.taxi;
+            break;
+        default:
+            return methLocomotion.avia;
+            break;
+    }
 };
 
 /**
@@ -231,11 +279,59 @@ SabreProvider.prototype.getPCCTimezone = function (config) {
     return 'Europe/Kaliningrad';
 };
 
+/* костыль для SIP, так как временные зоны не совпадают */
+SabreProvider.prototype.getTravelDuration = function(segment) {
+    let duration = 0,
+        isSIPDeparture = segment.get('R:DepartureAirport', nsUri).attr('LocationCode').value() === 'SIP',
+        isSIPArrival = segment.get('R:ArrivalAirport', nsUri).attr('LocationCode').value() === 'SIP';
+
+    if (isSIPArrival || isSIPDeparture) {
+        // все приводим в GMT и считаем разницу
+        let timezoneDeparture = isSIPDeparture ? SIPTimezone : ('0' + segment.get('R:DepartureTimeZone', nsUri).attr('GMTOffset').value()).slice(-2) + '00',
+            timezoneArrival = isSIPArrival ? SIPTimezone : ('0' + segment.get('R:ArrivalTimeZone', nsUri).attr('GMTOffset').value()).slice(-2) + '00';
+        let dateDeparture = new Date(segment.attr('DepartureDateTime').value() + '+' + timezoneDeparture),
+            dateArrival = new Date(segment.attr('ArrivalDateTime').value()  + '+' + timezoneArrival);
+
+        duration = (Date.UTC(dateArrival.getFullYear(), dateArrival.getMonth(), dateArrival.getDate(), dateArrival.getHours(), dateArrival.getMinutes()) -
+            Date.UTC(dateDeparture.getFullYear(), dateDeparture.getMonth(), dateDeparture.getDate(), dateDeparture.getHours(), dateDeparture.getMinutes())) / (1000 * 60);
+    }
+    if ( ! duration) {
+        duration = segment.attr('ElapsedTime') !== null ? segment.attr('ElapsedTime').value() : 0;
+    }
+
+    return duration;
+};
+
+/**
+ * Распарсивает XML ответ в нужную структуру.
+ * Дополнительно проверяем на наличие ошибок.
+ * Логируем. @todo логирование нормальное
+ *
+ * @todo возможно будет вынесено в общий модуль
+ * @param parseCallback
+ * @param body
+ * @param profileConfig
+ * @param parameters
+ * @returns {*}
+ */
+let parse = (parseCallback, body, profileConfig, parameters) => {
+    let xmlDoc = xmljs.parseXml(body);
+    let errorText = parseError(xmlDoc);
+
+    console.log(xmlDoc);
+
+    if (errorText !== '') {
+        throw new Error('GDS вернула ошибку ' + errorText);
+    }
+    return (parseCallback !== null && parseCallback !== undefined) ?
+        parseCallback(xmlDoc, profileConfig, parameters) : {};
+};
+
 let parseError = function (xmlDoc) {
     if (xmlDoc.get('//soap-env:Body/soap-env:Fault/faultstring', nsUri)) {
         return xmlDoc.get('//soap-env:Body/soap-env:Fault/faultstring', nsUri).text();
     } else if (xmlDoc.get('//R:Error[@Type="ERR"]', nsUri)) {
-        return xmlDoc.get('//R:Error[@Type="ERR"]', nsUri).text();
+        return xmlDoc.get('//R:Error[@Type="ERR"]', nsUri).attr('ShortText').value();
     }
 
     return '';

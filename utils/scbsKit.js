@@ -232,19 +232,19 @@ var scbsKit = (function() {
 
     /**
      *
-     * @param {type} e
-     * @param {type} c
-     * @param {type} a
-     * @param {type} currencyIn
-     * @param {type} currencyOut
-     * @param {type} fixedRate
-     * @param {type} provider
-     * @param {type} operation
-     * @param {type} pnr
-     * @returns {scbsKit_L3.scbsKit.prototype.getPrice.obj}
+     * @param e
+     * @param c
+     * @param a
+     * @param currencyIn
+     * @param currencyOut
+     * @param fixedRate
+     * @param provider
+     * @param operation
+     * @param pnr
+     * @returns {Object}
      */
     scbsKit.prototype.getPrice = function(e, c, a, currencyIn, currencyOut, fixedRate, provider, operation, pnr) {
-        var obj = new Object();
+        let obj = new Object();
         obj.elementType = (e === undefined) ? '' : e;
         obj.code = (c === undefined) ? '' : c;
         obj.amount = (a === undefined) ? '' :

@@ -1,7 +1,11 @@
-const provider = require('../sabre'),
-    scbsKit = require('../../../utils/scbsKit'),
-    currency = require('../../../utils/scbsCurrency'),
+const currency = require('../../../utils/scbsCurrency'),
     customTax = require('../../../utils/scbsCustomTax'),
+    provider = require('../sabre'),
+    scbsDate = require('../../../utils/scbsDate'),
+    scbsKit = require('../../../utils/scbsKit'),
+    tokenCrypt = require('../../../core/tokenCrypt');
+
+const clone = require('clone'),
     errors = require('request-promise-native/errors'),
     xmljs = require('libxmljs');
 
@@ -20,20 +24,26 @@ SabreFlights.prototype.execute = function (context, parameters, profileConfig) {
     console.info('Токен запроса %s', context.WBtoken);
     console.time("Sabre flights executed in");
 
+    var sess = {};
     return openSession(profileConfig, parameters)
         .then((sessionToken) => {
             return sessionToken;
         })
         .then((sessionToken) => {
+            sess[context.WBtoken] = sessionToken;
             return getFlights(profileConfig, parameters, sessionToken);
         })
-        .then((sessionToken) => {
-            return closeSession(profileConfig, parameters, sessionToken);
+        .then((flightsList) => {
+            console.log(sess[context.WBtoken]); // @todo проверить, не перезаписываются ли сессии при параллельных запросах
+            closeSession(profileConfig, parameters, sess[context.WBtoken])
+                .catch((err) => {
+                    console.error('Session close error: ' + err.message);
+                }); // отправляем запрос на закрытие, и сразу возвращаем результат
+            return flightsList;
         })
         .catch((err) => {
-            console.log(err instanceof errors.TransformError); // значит, это ошибка парсинга
             console.timeEnd("Sabre flights executed in");
-            return err;
+            throw err; // далее эта ошибка обработается в routes.js
         });
 };
 
@@ -63,6 +73,11 @@ let getFlights = function (profileConfig, parameters, sessionToken) {
     return provider.request(xmlRequest, parseFlightsResponse, profileConfig, parameters);
 };
 
+let closeSession = function (profileConfig, parameters, sessionToken) {
+    let xmlRequest = provider.buildRequest(new xmljs.Document(), profileConfig, 'Session', 'SessionCloseRQ', sessionToken);
+    return provider.request(xmlRequest, null, profileConfig, parameters);
+};
+
 /**
  * Вытаскивает токен сессии из ответа Sabre
  *
@@ -70,22 +85,6 @@ let getFlights = function (profileConfig, parameters, sessionToken) {
  */
 let parseSessionResponse = function (body) {
     return body.get('//wsse:BinarySecurityToken', provider.nsUri).text();
-};
-
-let closeSession = function (profileConfig, parameters, context, token) {
-    console.log("closeSession", token);
-    return Promise.resolve();
-    /*return request({
-      method: "POST",
-      uri: "http://ttb:8080",
-      form: parameters
-    })
-    .then(function (body) {
-      return true;
-    })
-    .catch(function (error) {
-      throw  basicError.getError(basicError.NETWORK_ERR, error);
-    }); */
 };
 
 let buildFlightsRequest = function (profileConfig, parameters) {
@@ -140,7 +139,7 @@ let buildFlightsRequest = function (profileConfig, parameters) {
     }
 
     cursor = cursor.node('CabinPref').attr({
-        Cabin: provider.serviceClass[parameters.serviceClass],
+        Cabin: provider.getServiceClass(parameters.serviceClass),
         PreferLevel: 'Only'
     }).parent();
 
@@ -155,7 +154,7 @@ let buildFlightsRequest = function (profileConfig, parameters) {
     parameters.seats.map(function (seat) {
         cursor = cursor
             .node('PassengerTypeQuantity').attr({
-                Code: provider.seatCode(seat.passengerType),
+                Code: provider.getSeatCode(seat.passengerType),
                 Quantity: seat.count
             }).parent();
     });
@@ -182,8 +181,6 @@ let parseFlightsResponse = function (xmlDoc, profileConfig, parameters) {
             isDiscounted = true;
         }
     });
-
-    console.log(''+xmlDoc);
 
     let result = xmlDoc.find('//R:PricedItineraries/R:PricedItinerary', provider.nsUri)
         .map(function (pricedItinerary) {
@@ -219,14 +216,14 @@ let parseFlightsResponse = function (xmlDoc, profileConfig, parameters) {
                 flightGroup.latinRegistration = true;
 
                 flightGroup.timeLimit = pricedItinerary.get('R:AirItineraryPricingInfo', provider.nsUri).attr('LastTicketDate')
-                    ? provider.formatISODate(pricedItinerary.get('R:AirItineraryPricingInfo', provider.nsUri).attr('LastTicketDate').value(), timezone)
-                    : provider.formatISODate(new Date(), timezone);
+                    ? scbsDate.formatISODate(pricedItinerary.get('R:AirItineraryPricingInfo', provider.nsUri).attr('LastTicketDate').value(), timezone)
+                    : scbsDate.formatISODate(new Date(), timezone);
 
                 flightGroup.itineraries = pricedItinerary.find('R:AirItinerary/R:OriginDestinationOptions/R:OriginDestinationOption', provider.nsUri)
                     .map(function (originDestinationOption) {
                         return {
                             flights: [{
-                                token: tokenCrypt.encode({}),
+                                token: "",
                                 seatsAvailable: pricedItinerary.get('R:AirItineraryPricingInfo/R:FareInfos/R:FareInfo/R:TPA_Extensions/R:SeatsRemaining', provider.nsUri).attr('Number').value(),
                                 segments: originDestinationOption.find('R:FlightSegment', provider.nsUri)
                                     .map(function (flightSegment) {
@@ -240,7 +237,7 @@ let parseFlightsResponse = function (xmlDoc, profileConfig, parameters) {
                                         segment.serviceClass = fareInfo !== undefined ? provider.getTitleByCode(fareInfo.get('R:TPA_Extensions/R:Cabin', provider.nsUri).attr('Cabin').value()) : '';
                                         segment.bookingClass = flightSegment.attr('ResBookDesigCode').value();
                                         segment.flightNumber = flightSegment.attr('FlightNumber').value();
-                                        segment.travelDuration = self.getTravelDuration(flightSegment);
+                                        segment.travelDuration = provider.getTravelDuration(flightSegment);
                                         if (flightSegment.get('R:MarketingAirline', provider.nsUri)) {
                                             segment.carrier = {code: flightSegment.get('R:MarketingAirline', provider.nsUri).attr('Code').value()};
                                             segment.marketingCarrier = clone(segment.carrier);
@@ -283,26 +280,28 @@ let parseFlightsResponse = function (xmlDoc, profileConfig, parameters) {
                 flightGroup.fares = {
                     fareDesc: {},
                     fareSeats: pricedItinerary.find('R:AirItineraryPricingInfo/R:PTC_FareBreakdowns/R:PTC_FareBreakdown', provider.nsUri)
-                        .map(function (Fare) {
-                            var tariffSource = Fare.get('R:PassengerFare/R:EquivFare', provider.nsUri) ?
-                                'EquivFare' : (Fare.get('R:PassengerFare/R:BaseFare', provider.nsUri) ?
+                        .map(function (fare) {
+                            let tariffSource = fare.get('R:PassengerFare/R:EquivFare', provider.nsUri) ?
+                                'EquivFare' : (fare.get('R:PassengerFare/R:BaseFare', provider.nsUri) ?
                                     'BaseFare' : null);
+
+
                             return {
-                                passengerType: provider.seatCode(Fare.get('R:PassengerTypeQuantity', provider.nsUri).attr('Code').value()),
-                                count: parseInt(Fare.get('R:PassengerTypeQuantity', provider.nsUri).attr('Quantity').value()),
+                                passengerType: provider.getSeatCode(fare.get('R:PassengerTypeQuantity', provider.nsUri).attr('Code').value()),
+                                count: parseInt(fare.get('R:PassengerTypeQuantity', provider.nsUri).attr('Quantity').value()),
                                 prices: [].concat([
                                         tariffSource !== null ? scbsKit.getPrice(
                                             'TARIFF',
                                             '',
-                                            parseFloat(Fare.get('R:PassengerFare/R:' + tariffSource, provider.nsUri).attr('Amount').value()),
-                                            Fare.get('R:PassengerFare/R:' + tariffSource, provider.nsUri).attr('CurrencyCode').value(),
+                                            parseFloat(fare.get('R:PassengerFare/R:' + tariffSource, provider.nsUri).attr('Amount').value()),
+                                            fare.get('R:PassengerFare/R:' + tariffSource, provider.nsUri).attr('CurrencyCode').value(),
                                             parameters.currency,
                                             null,
                                             provider,
                                             'flights',
                                             null)
                                             : 0
-                                    ], Fare.find('R:PassengerFare/R:Taxes/R:Tax', provider.nsUri).map(function (Tax) {
+                                    ], fare.find('R:PassengerFare/R:Taxes/R:Tax', provider.nsUri).map(function (Tax) {
                                         return scbsKit.getPrice(
                                             'TAXES',
                                             Tax.attr('TaxCode').value(),
@@ -311,7 +310,8 @@ let parseFlightsResponse = function (xmlDoc, profileConfig, parameters) {
                                             parameters.currency,
                                             null,
                                             provider,
-                                            self);
+                                            'flights',
+                                            null);
                                     }),
                                     zzTaxes),
                                 fareTotal: fareTotalWithZZ
@@ -330,10 +330,10 @@ let parseFlightsResponse = function (xmlDoc, profileConfig, parameters) {
                     isComplexFlight: isComplexFlight,
                     odo: pricedItinerary.find('R:AirItinerary/R:OriginDestinationOptions/R:OriginDestinationOption', provider.nsUri)
                         .map(function (OriginDestinationOption) {
-                            var isStarting = true;
+                            let isStarting = true;
                             return OriginDestinationOption.find('R:FlightSegment', provider.nsUri)
                                 .map(function (FlightSegment) {
-                                    var tokenSrc = [
+                                    let tokenSrc = [
                                         FlightSegment.attr('DepartureDateTime').value(),
                                         FlightSegment.attr('FlightNumber').value(),
                                         FlightSegment.get('R:ArrivalAirport', provider.nsUri).attr('LocationCode').value(),
@@ -361,7 +361,7 @@ let parseFlightsResponse = function (xmlDoc, profileConfig, parameters) {
             return group.token !== null;
         });
 
-    return result;
+    return {flightGroups: result};
 };
 
 let isPTCTypeMatch = function(messageNodes) {
