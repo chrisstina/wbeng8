@@ -1,6 +1,7 @@
-const errors = require('restify-errors'),
-    rp = require('request-promise-native'),
+const rp = require('request-promise-native'),
     xmljs = require('libxmljs');
+
+const basicProvider = new require('./../../core/provider')();
 
 /** @todo можно запихнуть в модуль config (экспортить настройки) */
 
@@ -91,6 +92,9 @@ const serviceClass = {
 var SabreProvider = function () {
 };
 
+SabreProvider.prototype.code = '1S';
+SabreProvider.prototype.name = 'Sabre';
+
 /**
  *
  * @param requestBody
@@ -130,7 +134,7 @@ SabreProvider.prototype.request = function (requestBody, parseCallback, profileC
  * @param {type} sessionToken
  * @returns Promise
  */
-SabreProvider.prototype.buildRequest = function (xmlBody, profileConfig, serviceName, actionName, sessionToken = null) {
+SabreProvider.prototype.wrapRequest = function (xmlBody, profileConfig, serviceName, actionName, sessionToken = null) {
     var xmlDoc = xmljs.parseXml(XMLTemplate);
 
     if (sessionToken === null) { // открываем сессию
@@ -307,7 +311,6 @@ SabreProvider.prototype.getTravelDuration = function(segment) {
  * Дополнительно проверяем на наличие ошибок.
  * Логируем. @todo логирование нормальное
  *
- * @todo возможно будет вынесено в общий модуль
  * @param parseCallback
  * @param body
  * @param profileConfig
@@ -315,16 +318,7 @@ SabreProvider.prototype.getTravelDuration = function(segment) {
  * @returns {*}
  */
 let parse = (parseCallback, body, profileConfig, parameters) => {
-    let xmlDoc = xmljs.parseXml(body);
-    let errorText = parseError(xmlDoc);
-
-    console.log(xmlDoc);
-
-    if (errorText !== '') {
-        throw new Error('GDS вернула ошибку ' + errorText);
-    }
-    return (parseCallback !== null && parseCallback !== undefined) ?
-        parseCallback(xmlDoc, profileConfig, parameters) : {};
+    return basicProvider.parse(parseCallback, body, profileConfig, parameters, parseError);
 };
 
 let parseError = function (xmlDoc) {

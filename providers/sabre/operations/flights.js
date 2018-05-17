@@ -24,18 +24,18 @@ SabreFlights.prototype.execute = function (context, parameters, profileConfig) {
     console.info('Токен запроса %s', context.WBtoken);
     console.time("Sabre flights executed in");
 
-    var sess = {};
+    var sessions = {};
     return openSession(profileConfig, parameters)
         .then((sessionToken) => {
             return sessionToken;
         })
         .then((sessionToken) => {
-            sess[context.WBtoken] = sessionToken;
+            sessions[context.WBtoken] = sessionToken;
             return getFlights(profileConfig, parameters, sessionToken);
         })
         .then((flightsList) => {
-            console.log(sess[context.WBtoken]); // @todo проверить, не перезаписываются ли сессии при параллельных запросах
-            closeSession(profileConfig, parameters, sess[context.WBtoken])
+            console.log(sessions[context.WBtoken]); // @todo проверить, не перезаписываются ли сессии при параллельных запросах
+            closeSession(profileConfig, parameters, sessions[context.WBtoken])
                 .catch((err) => {
                     console.error('Session close error: ' + err.message);
                 }); // отправляем запрос на закрытие, и сразу возвращаем результат
@@ -55,7 +55,7 @@ SabreFlights.prototype.execute = function (context, parameters, profileConfig) {
  * @returns {Request}
  */
 let openSession = function (profileConfig, parameters) {
-    let xmlRequest = provider.buildRequest(new xmljs.Document(), profileConfig, 'Session', 'SessionCreateRQ');
+    let xmlRequest = provider.wrapRequest(new xmljs.Document(), profileConfig, 'Session', 'SessionCreateRQ');
     return provider.request(xmlRequest, parseSessionResponse, profileConfig, parameters);
 };
 
@@ -69,12 +69,12 @@ let openSession = function (profileConfig, parameters) {
  */
 let getFlights = function (profileConfig, parameters, sessionToken) {
     let xmlBody = buildFlightsRequest(profileConfig, parameters);
-    let xmlRequest = provider.buildRequest(xmlBody, profileConfig, 'Air Shopping Service', 'BargainFinderMaxRQ', sessionToken);
+    let xmlRequest = provider.wrapRequest(xmlBody, profileConfig, 'Air Shopping Service', 'BargainFinderMaxRQ', sessionToken);
     return provider.request(xmlRequest, parseFlightsResponse, profileConfig, parameters);
 };
 
 let closeSession = function (profileConfig, parameters, sessionToken) {
-    let xmlRequest = provider.buildRequest(new xmljs.Document(), profileConfig, 'Session', 'SessionCloseRQ', sessionToken);
+    let xmlRequest = provider.wrapRequest(new xmljs.Document(), profileConfig, 'Session', 'SessionCloseRQ', sessionToken);
     return provider.request(xmlRequest, null, profileConfig, parameters);
 };
 
@@ -361,7 +361,7 @@ let parseFlightsResponse = function (xmlDoc, profileConfig, parameters) {
             return group.token !== null;
         });
 
-    return {flightGroups: result};
+    return result;
 };
 
 let isPTCTypeMatch = function(messageNodes) {

@@ -8,6 +8,21 @@
 var scbsMessenger = require('./scbsMessenger'),
     scbsValidator = require('./scbsValidator');
 
+module.exports.wrapResponse = function (result, exitPoint, token, profile) {
+    let response = {
+        token: token,
+        messages: result.messages,
+        context: {
+            version: 1,
+            environment: 1,
+            profile: profile
+        }
+    };
+
+    response[exitPoint] = result.data;
+    return this.response(response);
+};
+
 module.exports.request = function (parameters, entryPoint, context) {
     switch (entryPoint) {
         case 'book':
@@ -41,7 +56,7 @@ module.exports.errorResponse = function (e) {
     result.messages.message.push({
         type: 'ERROR',
         source: 'WBENG',
-        message: 'Legacy error: ' + e.stack.split("\n")[0].trim() + ' ' + e.stack.split("\n")[1].trim()
+        message: e.stack.split("\n")[0].trim() + ' ' + e.stack.split("\n")[1].trim()
     });
 
     try {
@@ -55,7 +70,7 @@ module.exports.errorResponse = function (e) {
     }
 
     return result;
-}
+};
 
 module.exports.response = function (result) {
     result.messages = {

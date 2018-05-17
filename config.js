@@ -4,6 +4,8 @@ module.exports = {
     env: process.env.NODE_ENV || 'development',
     port: process.env.PORT || 3000,
     providers: {
-        '1S': 'sabre'
+        '1S': 'sabre',
+        'TA': 'tais',
+        'TS': 'tais'
     }
 }
