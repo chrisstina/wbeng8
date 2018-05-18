@@ -33,6 +33,18 @@ module.exports = {
             name: 'TAIS SI',
             directory: 'taisSi',
             engine: 'tais'
+        },
+        {
+            code: 'PB',
+            name: 'Portbilet',
+            directory: 'portbilet',
+            engine: 'portbilet'
+        },
+        {
+            code: 'DP', // только а\к Победа
+            name: 'Portbilet DP',
+            directory: 'portbiletDP',
+            engine: 'portbilet'
         }
     ],
     operations: [
@@ -40,45 +52,45 @@ module.exports = {
             name: 'flights', // по этому имени ищется файл в [provider]/operations
             exit: 'flightGroups', // это поле подставляется во время форматирования ответа (legacy)
         },
-        {
-            name: 'matrix',
-            exit: 'flightGroups',
-        },
-        {
-            name: 'flightfares',
-            exit: 'flightGroups',
-        },
-        {
-            name: 'schedule',
-            exit: 'flightGroups',
-        },
-        {
-            name: 'price',
-            exit: 'bookingFile',
-        },
-        {
-            name: 'book',
-            exit: 'bookingFile',
-        },
-        {
-            name: 'ticket',
-            exit: 'bookingFile',
-        },
-        {
-            name: 'display',
-            exit: 'bookingFile',
-        },
-        {
-            name: 'cancel',
-            exit: 'bookingFile',
-        },
-        {
-            name: 'void',
-            exit: 'bookingFile',
-        },
-        {
-            name: 'fares',
-            exit: 'remarkGroups',
-        },
+        // {
+        //     name: 'matrix',
+        //     exit: 'flightGroups',
+        // },
+        // {
+        //     name: 'flightfares',
+        //     exit: 'flightGroups',
+        // },
+        // {
+        //     name: 'schedule',
+        //     exit: 'flightGroups',
+        // },
+        // {
+        //     name: 'price',
+        //     exit: 'bookingFile',
+        // },
+        // {
+        //     name: 'book',
+        //     exit: 'bookingFile',
+        // },
+        // {
+        //     name: 'ticket',
+        //     exit: 'bookingFile',
+        // },
+        // {
+        //     name: 'display',
+        //     exit: 'bookingFile',
+        // },
+        // {
+        //     name: 'cancel',
+        //     exit: 'bookingFile',
+        // },
+        // {
+        //     name: 'void',
+        //     exit: 'bookingFile',
+        // },
+        // {
+        //     name: 'fares',
+        //     exit: 'remarkGroups',
+        // },
     ]
 }
