@@ -2,6 +2,7 @@ const clone = require('clone'),
     restErrors = require('restify-errors');
 
 const config = require('./../config'),
+    basicProvider = new require('./../core/provider')(),
     responseFormatter = require('./../utils/scbsResponse');
 
 let defaultPriority = ['DP', 'S7', 'TS', '1S', '2H', '1H', 'PB', '1G', 'TA'];//'3H', '4H', '5H', '6H', '7H',
@@ -11,6 +12,9 @@ let alternativeFaresAllowed = [ // выводить ли кнопку "Все т
     { gds: 'GALILEO', carriers: ['*'] },
     { gds: 'AMADEUS', carriers: ['*'] }
 ];
+let operationConfig = config.operations.find((element) => {
+    return element.name === 'flights'
+});
 
 module.exports = (req, res, next, profileModule, operationsModule) => {
     let providerCodes = req.params.context.provider.split(',');
@@ -18,30 +22,33 @@ module.exports = (req, res, next, profileModule, operationsModule) => {
 
     try {
         providerCodes.map((code) => {
-            var providerName = config['providers'][code];
+            let provider = basicProvider.getByCode(code);
+            var providerName = provider.directory;
             var operation = operationsModule.getProviderOperation(providerName, 'flights');
-            var profileConfig = profileModule.getProviderProfile(req.userProfile, providerName);
+            if (operation !== null) {
+                var profileConfig = profileModule.getProviderProfile(req.userProfile, providerName);
 
-            searchRequests.push( // набираем запросы конкретных провайдеров на параллельное исполнение
-                operation.execute(
-                    req.params.context,
-                    req.params.parameters,
-                    profileConfig
-                ).then((result) => { // подготавливаем каждый ответ в нужном для разбора формате
-                    return {
-                        data: result,
-                        messages: [],
-                        provider: code
-                    }
-                })
-                .catch(e => { // отлов ошибок каждого запроса. засчет этого, если один из запросов фэйлится, остальные продолжат выполняться
-                    return {
-                        data: [],
-                        messages: [e.message],
-                        provider: code
-                    }
-                }),
-            );
+                searchRequests.push( // набираем запросы конкретных провайдеров на параллельное исполнение
+                    operation.execute(
+                        req.params.context,
+                        req.params.parameters,
+                        profileConfig
+                    ).then((result) => { // подготавливаем каждый ответ в нужном для разбора формате
+                        return {
+                            data: result,
+                            messages: [],
+                            provider: code
+                        }
+                    })
+                    .catch(e => { // отлов ошибок каждого запроса. засчет этого, если один из запросов фэйлится, остальные продолжат выполняться
+                        return {
+                            data: [],
+                            messages: [e.message],
+                            provider: code
+                        }
+                    }),
+                );
+            }
         });
     } catch (e) {
         next(e);
@@ -108,7 +115,7 @@ module.exports = (req, res, next, profileModule, operationsModule) => {
 
                 let formattedResult = responseFormatter.wrapResponse(
                     returns,
-                    'flightGroups',
+                    operationConfig.exit,
                     req.params.context.WBtoken,
                     req.userProfile
                 );

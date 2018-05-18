@@ -93,7 +93,7 @@ var SabreProvider = function () {
 };
 
 SabreProvider.prototype.code = '1S';
-SabreProvider.prototype.name = 'Sabre';
+SabreProvider.prototype.name = 'SABRE';
 
 /**
  *

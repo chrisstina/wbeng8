@@ -163,7 +163,7 @@ let parseFlightsResponse = (xmlDoc, profileConfig, parameters) => {
             rules: ruleKeysDesc.join('§'),
             gds: gds
         });
-        flightGroup.provider = provider.code;
+        flightGroup.provider = profileConfig.providerSettings.code;
         flightGroup.carrier = { code: carrier };
         flightGroup.eticket = (shopOption.get('SIG:FareInfo/SIG:Ticketing', provider.nsUri).attr('eTicket').value() === 'true');
         flightGroup.timeLimit = shopOption.get('SIG:FareInfo/SIG:Ticketing', provider.nsUri).attr('TimeLimit').value();

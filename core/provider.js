@@ -1,7 +1,23 @@
+const config = require('./../config');
+
 const xmljs = require('libxmljs');
 
 module.exports = () => {
     return {
+        getByCode: (code) => {
+            let p = config.providers.find((element) => {
+                return element.code === code;
+            });
+
+            return (p !== undefined) ? p : null;
+        },
+        getByDirectory: (code) => {
+            let p = config.providers.find((element) => {
+                return element.directory === code;
+            });
+
+            return (p !== undefined) ? p : null;
+        },
         /**
          * Распарсивает XML ответ в нужную структуру.
          * Дополнительно проверяем на наличие ошибок.

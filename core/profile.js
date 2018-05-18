@@ -1,5 +1,7 @@
 const fs = require('fs');
-const profilesDir = __dirname + '/../profiles';
+
+const basicProvider = new require('./provider')(),
+    profilesDir = __dirname + '/../profiles';
 
 module.exports = () => {
     var profiles = {};
@@ -102,6 +104,13 @@ module.exports = () => {
             if (profiles[profileName][providerName] === undefined) {
                 throw new Error('Не настроен профиль');
             }
+
+            // добавляем общие настройки провайдера (например, код)
+            let provider = basicProvider.getByDirectory(providerName);
+            if (provider !== null) {
+                profiles[profileName][providerName]['providerSettings'] = provider; // берем все из конфига по провайдеру
+            }
+
             return profiles[profileName][providerName];
         }
     };

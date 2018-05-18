@@ -209,8 +209,8 @@ let parseFlightsResponse = function (xmlDoc, profileConfig, parameters) {
 
                 var flightGroup = scbsKit.getFlightGroup();
 
-                flightGroup.provider = provider.code;
-                flightGroup.gds = provider.name;
+                flightGroup.provider = profileConfig.providerSettings.code;
+                flightGroup.gds = profileConfig.providerSettings.name;
                 flightGroup.carrier = {code: validatingCarrier};
                 flightGroup.eticket = true;
                 flightGroup.latinRegistration = true;
