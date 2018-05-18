@@ -23,7 +23,7 @@ module.exports = (req, res, next, profileModule, operationsModule) => {
     try {
         providerCodes.map((code) => {
             let provider = basicProvider.getByCode(code);
-            var providerName = provider.directory;
+            var providerName = (provider !== null) ? provider.directory : null;
             var operation = operationsModule.getProviderOperation(providerName, 'flights');
             if (operation !== null) {
                 var profileConfig = profileModule.getProviderProfile(req.userProfile, providerName);
