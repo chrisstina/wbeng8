@@ -11,6 +11,12 @@ module.exports = {
             engine: 'sabre' // папка с обработчиком API поставщика
         },
         {
+            code: '2S',
+            name: 'Sabre KZ',
+            directory: 'sabreKZ',
+            engine: 'sabre'
+        },
+        {
             code: 'TA',
             name: 'TAIS',
             directory: 'tais',
@@ -20,6 +26,12 @@ module.exports = {
             code: '1A',
             name: 'TAIS 1A',
             directory: 'tais1A',
+            engine: 'tais'
+        },
+        {
+            code: 'TS',
+            name: 'TAIS SI',
+            directory: 'taisSi',
             engine: 'tais'
         }
     ],
