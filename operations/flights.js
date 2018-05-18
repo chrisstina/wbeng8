@@ -51,6 +51,7 @@ module.exports = (req, res, next, profileModule, operationsModule) => {
             }
         });
     } catch (e) {
+        console.error(e);
         next(e);
     }
 
@@ -98,11 +99,13 @@ module.exports = (req, res, next, profileModule, operationsModule) => {
 
                     returns = getUniqueFlights(results, codes, localPriority);
                 } else {
-                    returns.push(results[0].data);
+                    if (results[0]  !== undefined && results[0].data) {
+                        returns.push(results[0].data);
+                    }
                 }
 
                 // форматируем вывод - код из старого wbeng
-                returns.map(function (result) {
+                results.map(function (result) {
                     messages = messages.concat(result.messages);
                 });
 

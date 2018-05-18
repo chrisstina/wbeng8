@@ -36,7 +36,7 @@ module.exports = () => {
 
             console.log('response' + xmlDoc);
 
-            if (errorText !== '') {
+            if (errorText !== '') {  // @todo тут могут быть не только ошибки, оборачивать в messages
                 throw new Error('GDS вернула ошибку ' + errorText);
             }
 
@@ -48,6 +48,9 @@ module.exports = () => {
                 def = false;
             }
             return (node && node.attr(attr) ? node.attr(attr).value() : def);
+        },
+        getNodeText: (node, text) => {
+            return (node && node.get(text) ? node.get(text).text() : '');
         }
     };
 }
