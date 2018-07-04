@@ -6,13 +6,13 @@ module.exports = {
     providers: [
         {
             code: '1S',
-            name: 'Sabre',
+            name: 'SABRE',
             directory: 'sabre', // название папки конфигов этого провайдера
             engine: 'sabre' // папка с обработчиком API поставщика
         },
         {
             code: '2S',
-            name: 'Sabre KZ',
+            name: 'SABREKZ',
             directory: 'sabreKZ',
             engine: 'sabre'
         },
@@ -24,19 +24,19 @@ module.exports = {
         },
         {
             code: '1A',
-            name: 'TAIS 1A',
+            name: 'AMADEUS',
             directory: 'tais1A',
             engine: 'tais'
         },
         {
             code: 'TS',
-            name: 'TAIS SI',
+            name: 'SIAM',
             directory: 'taisSi',
             engine: 'tais'
         },
         {
             code: 'PB',
-            name: 'Portbilet',
+            name: 'PORTBILET',
             directory: 'portbilet',
             engine: 'portbilet'
         },
@@ -45,7 +45,13 @@ module.exports = {
             name: 'Portbilet DP',
             directory: 'portbiletDP',
             engine: 'portbilet'
-        }
+        },
+        // {
+        //     code: '1G',
+        //     name: 'Galileo',
+        //     directory: 'galileo',
+        //     engine: 'galileo'
+        // },
     ],
     operations: [
         {

@@ -2,7 +2,8 @@ const clone = require('clone'),
     restErrors = require('restify-errors');
 
 const config = require('./../config'),
-    basicProvider = new require('./../core/provider')(),
+    basicEngine = require('./../core/engine'),
+    scbsMessenger = require('./../utils/scbsMessenger'),
     responseFormatter = require('./../utils/scbsResponse');
 
 let defaultPriority = ['DP', 'S7', 'TS', '1S', '2H', '1H', 'PB', '1G', 'TA'];//'3H', '4H', '5H', '6H', '7H',
@@ -22,7 +23,7 @@ module.exports = (req, res, next, profileModule, operationsModule) => {
 
     try {
         providerCodes.map((code) => {
-            let provider = basicProvider.getByCode(code);
+            let provider = basicEngine.getByCode(code);
             var providerName = (provider !== null) ? provider.directory : null;
             var operation = operationsModule.getProviderOperation(providerName, 'flights');
             if (operation !== null) {
@@ -36,14 +37,14 @@ module.exports = (req, res, next, profileModule, operationsModule) => {
                     ).then((result) => { // подготавливаем каждый ответ в нужном для разбора формате
                         return {
                             data: result,
-                            messages: [],
+                            messages: [], // @todo messages
                             provider: code
                         }
                     })
                     .catch(e => { // отлов ошибок каждого запроса. засчет этого, если один из запросов фэйлится, остальные продолжат выполняться
                         return {
                             data: [],
-                            messages: [e.message],
+                            messages: [scbsMessenger.getMessage(e.stack.split("\n")[0].trim() + ' ' + e.stack.split("\n")[1].trim(), 'REQUEST')],
                             provider: code
                         }
                     }),

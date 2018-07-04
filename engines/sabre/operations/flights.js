@@ -1,6 +1,5 @@
 const currency = require('../../../utils/scbsCurrency'),
     customTax = require('../../../utils/scbsCustomTax'),
-    provider = require('../sabre'),
     scbsDate = require('../../../utils/scbsDate'),
     scbsKit = require('../../../utils/scbsKit'),
     tokenCrypt = require('../../../core/tokenCrypt');
@@ -9,7 +8,10 @@ const clone = require('clone'),
     errors = require('request-promise-native/errors'),
     xmljs = require('libxmljs');
 
-var SabreFlights = function () {
+var engine;
+
+var SabreFlights = function (operationEngine) {
+    engine = operationEngine;
 };
 
 /**
@@ -55,8 +57,8 @@ SabreFlights.prototype.execute = function (context, parameters, profileConfig) {
  * @returns {Request}
  */
 let openSession = function (profileConfig, parameters) {
-    let xmlRequest = provider.wrapRequest(new xmljs.Document(), profileConfig, 'Session', 'SessionCreateRQ');
-    return provider.request(xmlRequest, parseSessionResponse, profileConfig, parameters);
+    let xmlRequest = engine.wrapRequest(new xmljs.Document(), profileConfig, 'Session', 'SessionCreateRQ');
+    return engine.request(xmlRequest, parseSessionResponse, profileConfig, parameters);
 };
 
 /**
@@ -69,13 +71,13 @@ let openSession = function (profileConfig, parameters) {
  */
 let getFlights = function (profileConfig, parameters, sessionToken) {
     let xmlBody = buildFlightsRequest(profileConfig, parameters);
-    let xmlRequest = provider.wrapRequest(xmlBody, profileConfig, 'Air Shopping Service', 'BargainFinderMaxRQ', sessionToken);
-    return provider.request(xmlRequest, parseFlightsResponse, profileConfig, parameters);
+    let xmlRequest = engine.wrapRequest(xmlBody, profileConfig, 'Air Shopping Service', 'BargainFinderMaxRQ', sessionToken);
+    return engine.request(xmlRequest, parseFlightsResponse, profileConfig, parameters);
 };
 
 let closeSession = function (profileConfig, parameters, sessionToken) {
-    let xmlRequest = provider.wrapRequest(new xmljs.Document(), profileConfig, 'Session', 'SessionCloseRQ', sessionToken);
-    return provider.request(xmlRequest, null, profileConfig, parameters);
+    let xmlRequest = engine.wrapRequest(new xmljs.Document(), profileConfig, 'Session', 'SessionCloseRQ', sessionToken);
+    return engine.request(xmlRequest, null, profileConfig, parameters);
 };
 
 /**
@@ -84,7 +86,7 @@ let closeSession = function (profileConfig, parameters, sessionToken) {
  * @param {type} body ответ raw XML
  */
 let parseSessionResponse = function (body) {
-    return body.get('//wsse:BinarySecurityToken', provider.nsUri).text();
+    return body.get('//wsse:BinarySecurityToken', engine.nsUri).text();
 };
 
 let buildFlightsRequest = function (profileConfig, parameters) {
@@ -139,7 +141,7 @@ let buildFlightsRequest = function (profileConfig, parameters) {
     }
 
     cursor = cursor.node('CabinPref').attr({
-        Cabin: provider.getServiceClass(parameters.serviceClass),
+        Cabin: engine.getServiceClass(parameters.serviceClass),
         PreferLevel: 'Only'
     }).parent();
 
@@ -154,7 +156,7 @@ let buildFlightsRequest = function (profileConfig, parameters) {
     parameters.seats.map(function (seat) {
         cursor = cursor
             .node('PassengerTypeQuantity').attr({
-                Code: provider.getSeatCode(seat.passengerType),
+                Code: engine.getSeatCode(seat.passengerType),
                 Quantity: seat.count
             }).parent();
     });
@@ -173,39 +175,39 @@ let buildFlightsRequest = function (profileConfig, parameters) {
 
 let parseFlightsResponse = function (xmlDoc, profileConfig, parameters) {
     let isDiscounted = false,
-        timezone = provider.getPCCTimezone(profileConfig);
+        timezone = engine.getPCCTimezone(profileConfig);
 
     parameters.seats.map(function (seat) {
-        if (seat.passengerType === provider.passengerTypes.senior.title ||
-            seat.passengerType === provider.passengerTypes.youth.title) {
+        if (seat.passengerType === engine.passengerTypes.senior.title ||
+            seat.passengerType === engine.passengerTypes.youth.title) {
             isDiscounted = true;
         }
     });
 
-    let result = xmlDoc.find('//R:PricedItineraries/R:PricedItinerary', provider.nsUri)
+    let result = xmlDoc.find('//R:PricedItineraries/R:PricedItinerary', engine.nsUri)
         .map(function (pricedItinerary) {
             let validatingCarrier,
-                carrierNode = pricedItinerary.get('R:TPA_Extensions/R:ValidatingCarrier', provider.nsUri),
-                totalFare = pricedItinerary.get('R:AirItineraryPricingInfo/R:ItinTotalFare/R:TotalFare', provider.nsUri),
+                carrierNode = pricedItinerary.get('R:TPA_Extensions/R:ValidatingCarrier', engine.nsUri),
+                totalFare = pricedItinerary.get('R:AirItineraryPricingInfo/R:ItinTotalFare/R:TotalFare', engine.nsUri),
                 fareIdx = 0,
                 totalFareConverted = currency.convertAmount(
                     parseFloat(totalFare.attr('Amount').value()),
                     totalFare.attr('CurrencyCode').value(),
                     parameters.currency,
                     null,
-                    provider,
+                    engine,
                     'flights',
                     null,
                     'TOTAL'),
                 fareRuleBasises = [],
                 isComplexFlight = false;
 
-            if (isDiscounted && ! isPTCTypeMatch(pricedItinerary.find('R:AirItineraryPricingInfo/R:PTC_FareBreakdowns/R:PTC_FareBreakdown/R:PassengerFare/R:TPA_Extensions/R:Messages/R:Message', provider.nsUri))) {
+            if (isDiscounted && ! isPTCTypeMatch(pricedItinerary.find('R:AirItineraryPricingInfo/R:PTC_FareBreakdowns/R:PTC_FareBreakdown/R:PassengerFare/R:TPA_Extensions/R:Messages/R:Message', engine.nsUri))) {
                 return {token: null};
             } else {
                 validatingCarrier = (carrierNode !== null) ?
                     carrierNode.attr("Code").value() :
-                    pricedItinerary.get('R:AirItinerary/R:OriginDestinationOptions/R:OriginDestinationOption/R:FlightSegment/R:MarketingAirline', provider.nsUri).attr('Code').value();
+                    pricedItinerary.get('R:AirItinerary/R:OriginDestinationOptions/R:OriginDestinationOption/R:FlightSegment/R:MarketingAirline', engine.nsUri).attr('Code').value();
 
                 var flightGroup = scbsKit.getFlightGroup();
 
@@ -215,51 +217,51 @@ let parseFlightsResponse = function (xmlDoc, profileConfig, parameters) {
                 flightGroup.eticket = true;
                 flightGroup.latinRegistration = true;
 
-                flightGroup.timeLimit = pricedItinerary.get('R:AirItineraryPricingInfo', provider.nsUri).attr('LastTicketDate')
-                    ? scbsDate.formatISODate(pricedItinerary.get('R:AirItineraryPricingInfo', provider.nsUri).attr('LastTicketDate').value(), timezone)
+                flightGroup.timeLimit = pricedItinerary.get('R:AirItineraryPricingInfo', engine.nsUri).attr('LastTicketDate')
+                    ? scbsDate.formatISODate(pricedItinerary.get('R:AirItineraryPricingInfo', engine.nsUri).attr('LastTicketDate').value(), timezone)
                     : scbsDate.formatISODate(new Date(), timezone);
 
-                flightGroup.itineraries = pricedItinerary.find('R:AirItinerary/R:OriginDestinationOptions/R:OriginDestinationOption', provider.nsUri)
+                flightGroup.itineraries = pricedItinerary.find('R:AirItinerary/R:OriginDestinationOptions/R:OriginDestinationOption', engine.nsUri)
                     .map(function (originDestinationOption) {
                         return {
                             flights: [{
                                 token: "",
-                                seatsAvailable: pricedItinerary.get('R:AirItineraryPricingInfo/R:FareInfos/R:FareInfo/R:TPA_Extensions/R:SeatsRemaining', provider.nsUri).attr('Number').value(),
-                                segments: originDestinationOption.find('R:FlightSegment', provider.nsUri)
+                                seatsAvailable: pricedItinerary.get('R:AirItineraryPricingInfo/R:FareInfos/R:FareInfo/R:TPA_Extensions/R:SeatsRemaining', engine.nsUri).attr('Number').value(),
+                                segments: originDestinationOption.find('R:FlightSegment', engine.nsUri)
                                     .map(function (flightSegment) {
                                         var segment = scbsKit.getSegment(),
-                                            fareBreakdown = pricedItinerary.get('R:AirItineraryPricingInfo/R:PTC_FareBreakdowns/R:PTC_FareBreakdown', provider.nsUri),
-                                            fareInfo = pricedItinerary.get('R:AirItineraryPricingInfo/R:FareInfos/R:FareInfo[position() = ' + (fareIdx + 1) + ']', provider.nsUri),
-                                            segmentFareBasis = fareBreakdown.get('R:FareBasisCodes/R:FareBasisCode[position() = ' + (++fareIdx) + ']', provider.nsUri).text();
+                                            fareBreakdown = pricedItinerary.get('R:AirItineraryPricingInfo/R:PTC_FareBreakdowns/R:PTC_FareBreakdown', engine.nsUri),
+                                            fareInfo = pricedItinerary.get('R:AirItineraryPricingInfo/R:FareInfos/R:FareInfo[position() = ' + (fareIdx + 1) + ']', engine.nsUri),
+                                            segmentFareBasis = fareBreakdown.get('R:FareBasisCodes/R:FareBasisCode[position() = ' + (++fareIdx) + ']', engine.nsUri).text();
                                         fareRuleBasises.push(segmentFareBasis),
-                                            equipmentCode = flightSegment.get('R:Equipment', provider.nsUri).attr('AirEquipType').value();
+                                            equipmentCode = flightSegment.get('R:Equipment', engine.nsUri).attr('AirEquipType').value();
 
-                                        segment.serviceClass = fareInfo !== undefined ? provider.getTitleByCode(fareInfo.get('R:TPA_Extensions/R:Cabin', provider.nsUri).attr('Cabin').value()) : '';
+                                        segment.serviceClass = fareInfo !== undefined ? engine.getTitleByCode(fareInfo.get('R:TPA_Extensions/R:Cabin', engine.nsUri).attr('Cabin').value()) : '';
                                         segment.bookingClass = flightSegment.attr('ResBookDesigCode').value();
                                         segment.flightNumber = flightSegment.attr('FlightNumber').value();
-                                        segment.travelDuration = provider.getTravelDuration(flightSegment);
-                                        if (flightSegment.get('R:MarketingAirline', provider.nsUri)) {
-                                            segment.carrier = {code: flightSegment.get('R:MarketingAirline', provider.nsUri).attr('Code').value()};
+                                        segment.travelDuration = engine.getTravelDuration(flightSegment);
+                                        if (flightSegment.get('R:MarketingAirline', engine.nsUri)) {
+                                            segment.carrier = {code: flightSegment.get('R:MarketingAirline', engine.nsUri).attr('Code').value()};
                                             segment.marketingCarrier = clone(segment.carrier);
                                         }
-                                        if (flightSegment.get('R:OperatingAirline', provider.nsUri)) {
-                                            segment.carrier = {code: flightSegment.get('R:OperatingAirline', provider.nsUri).attr('Code').value()};
+                                        if (flightSegment.get('R:OperatingAirline', engine.nsUri)) {
+                                            segment.carrier = {code: flightSegment.get('R:OperatingAirline', engine.nsUri).attr('Code').value()};
                                             segment.operatingCarrier = clone(segment.carrier);
                                         }
                                         segment.equipment = {code: equipmentCode};
-                                        segment.locationBegin = {code: flightSegment.get('R:DepartureAirport', provider.nsUri).attr('LocationCode').value()};
-                                        segment.locationEnd = {code: flightSegment.get('R:ArrivalAirport', provider.nsUri).attr('LocationCode').value()};
+                                        segment.locationBegin = {code: flightSegment.get('R:DepartureAirport', engine.nsUri).attr('LocationCode').value()};
+                                        segment.locationEnd = {code: flightSegment.get('R:ArrivalAirport', engine.nsUri).attr('LocationCode').value()};
                                         segment.dateBegin = flightSegment.attr('DepartureDateTime').value();
                                         segment.dateEnd = flightSegment.attr('ArrivalDateTime').value();
-                                        segment.terminalBegin = flightSegment.get('R:DepartureAirport', provider.nsUri).attr('TerminalID')
-                                            ? flightSegment.get('R:DepartureAirport', provider.nsUri).attr('TerminalID').value() : '';
-                                        segment.terminalEnd = flightSegment.get('R:ArrivalAirport', provider.nsUri).attr('TerminalID')
-                                            ? flightSegment.get('R:ArrivalAirport', provider.nsUri).attr('TerminalID').value() : '';
+                                        segment.terminalBegin = flightSegment.get('R:DepartureAirport', engine.nsUri).attr('TerminalID')
+                                            ? flightSegment.get('R:DepartureAirport', engine.nsUri).attr('TerminalID').value() : '';
+                                        segment.terminalEnd = flightSegment.get('R:ArrivalAirport', engine.nsUri).attr('TerminalID')
+                                            ? flightSegment.get('R:ArrivalAirport', engine.nsUri).attr('TerminalID').value() : '';
                                         segment.fareBasis = segmentFareBasis;
-                                        segment.methLocomotion = provider.getMethLocomotion(equipmentCode);
+                                        segment.methLocomotion = engine.getMethLocomotion(equipmentCode);
 
-                                        if (flightSegment.get('R:StopAirports', provider.nsUri) !== null) {
-                                            flightSegment.find('R:StopAirports/R:StopAirport', provider.nsUri).map(function (stop) {
+                                        if (flightSegment.get('R:StopAirports', engine.nsUri) !== null) {
+                                            flightSegment.find('R:StopAirports/R:StopAirport', engine.nsUri).map(function (stop) {
                                                 var landing = scbsKit.getLanding();
                                                 landing.locationCode.code = stop.attr('LocationCode').value();
                                                 landing.dateBegin = stop.attr('DepartureDateTime').value();
@@ -279,29 +281,29 @@ let parseFlightsResponse = function (xmlDoc, profileConfig, parameters) {
 
                 flightGroup.fares = {
                     fareDesc: {},
-                    fareSeats: pricedItinerary.find('R:AirItineraryPricingInfo/R:PTC_FareBreakdowns/R:PTC_FareBreakdown', provider.nsUri)
+                    fareSeats: pricedItinerary.find('R:AirItineraryPricingInfo/R:PTC_FareBreakdowns/R:PTC_FareBreakdown', engine.nsUri)
                         .map(function (fare) {
-                            let tariffSource = fare.get('R:PassengerFare/R:EquivFare', provider.nsUri) ?
-                                'EquivFare' : (fare.get('R:PassengerFare/R:BaseFare', provider.nsUri) ?
+                            let tariffSource = fare.get('R:PassengerFare/R:EquivFare', engine.nsUri) ?
+                                'EquivFare' : (fare.get('R:PassengerFare/R:BaseFare', engine.nsUri) ?
                                     'BaseFare' : null);
 
 
                             return {
-                                passengerType: provider.getSeatCode(fare.get('R:PassengerTypeQuantity', provider.nsUri).attr('Code').value()),
-                                count: parseInt(fare.get('R:PassengerTypeQuantity', provider.nsUri).attr('Quantity').value()),
+                                passengerType: engine.getSeatCode(fare.get('R:PassengerTypeQuantity', engine.nsUri).attr('Code').value()),
+                                count: parseInt(fare.get('R:PassengerTypeQuantity', engine.nsUri).attr('Quantity').value()),
                                 prices: [].concat([
                                         tariffSource !== null ? scbsKit.getPrice(
                                             'TARIFF',
                                             '',
-                                            parseFloat(fare.get('R:PassengerFare/R:' + tariffSource, provider.nsUri).attr('Amount').value()),
-                                            fare.get('R:PassengerFare/R:' + tariffSource, provider.nsUri).attr('CurrencyCode').value(),
+                                            parseFloat(fare.get('R:PassengerFare/R:' + tariffSource, engine.nsUri).attr('Amount').value()),
+                                            fare.get('R:PassengerFare/R:' + tariffSource, engine.nsUri).attr('CurrencyCode').value(),
                                             parameters.currency,
                                             null,
-                                            provider,
+                                            engine,
                                             'flights',
                                             null)
                                             : 0
-                                    ], fare.find('R:PassengerFare/R:Taxes/R:Tax', provider.nsUri).map(function (Tax) {
+                                    ], fare.find('R:PassengerFare/R:Taxes/R:Tax', engine.nsUri).map(function (Tax) {
                                         return scbsKit.getPrice(
                                             'TAXES',
                                             Tax.attr('TaxCode').value(),
@@ -309,7 +311,7 @@ let parseFlightsResponse = function (xmlDoc, profileConfig, parameters) {
                                             Tax.attr('CurrencyCode').value(),
                                             parameters.currency,
                                             null,
-                                            provider,
+                                            engine,
                                             'flights',
                                             null);
                                     }),
@@ -323,26 +325,26 @@ let parseFlightsResponse = function (xmlDoc, profileConfig, parameters) {
                 isComplexFlight = (parameters.route.length > 2 || (parameters.route.length === 2 && parameters.route[0].locationBegin.code !== parameters.route[1].locationEnd.code)); // для проверки структуры при прайсе
 
                 flightGroup.token = tokenCrypt.encode({
-                    provider: provider.code,
+                    provider: engine.code,
                     seats: parameters.seats,
                     fareRuleBasises: fareRuleBasises,
                     requestedItineraries: parameters.route.length,
                     isComplexFlight: isComplexFlight,
-                    odo: pricedItinerary.find('R:AirItinerary/R:OriginDestinationOptions/R:OriginDestinationOption', provider.nsUri)
+                    odo: pricedItinerary.find('R:AirItinerary/R:OriginDestinationOptions/R:OriginDestinationOption', engine.nsUri)
                         .map(function (OriginDestinationOption) {
                             let isStarting = true;
-                            return OriginDestinationOption.find('R:FlightSegment', provider.nsUri)
+                            return OriginDestinationOption.find('R:FlightSegment', engine.nsUri)
                                 .map(function (FlightSegment) {
                                     let tokenSrc = [
                                         FlightSegment.attr('DepartureDateTime').value(),
                                         FlightSegment.attr('FlightNumber').value(),
-                                        FlightSegment.get('R:ArrivalAirport', provider.nsUri).attr('LocationCode').value(),
-                                        FlightSegment.get('R:MarketingAirline', provider.nsUri).attr('Code').value(),
-                                        FlightSegment.get('R:DepartureAirport', provider.nsUri).attr('LocationCode').value(),
+                                        FlightSegment.get('R:ArrivalAirport', engine.nsUri).attr('LocationCode').value(),
+                                        FlightSegment.get('R:MarketingAirline', engine.nsUri).attr('Code').value(),
+                                        FlightSegment.get('R:DepartureAirport', engine.nsUri).attr('LocationCode').value(),
                                         FlightSegment.attr('ResBookDesigCode').value(),
                                         FlightSegment.attr('ArrivalDateTime').value(),
-                                        FlightSegment.get('R:Equipment', provider.nsUri).attr('AirEquipType').value(),
-                                        FlightSegment.get('R:MarriageGrp', provider.nsUri).text(),
+                                        FlightSegment.get('R:Equipment', engine.nsUri).attr('AirEquipType').value(),
+                                        FlightSegment.get('R:MarriageGrp', engine.nsUri).text(),
                                         FlightSegment.attr('ElapsedTime').value(),
                                         isStarting
                                     ].join('§');
@@ -352,7 +354,7 @@ let parseFlightsResponse = function (xmlDoc, profileConfig, parameters) {
                         }).join('|'),
                     requestedServiceClass: parameters.serviceClass, // для flightfares
                     requestedRoute: parameters.route, // для flightfares
-                    carrier: pricedItinerary.get('R:AirItinerary/R:OriginDestinationOptions/R:OriginDestinationOption/R:FlightSegment/R:MarketingAirline', provider.nsUri).attr('Code').value()
+                    carrier: pricedItinerary.get('R:AirItinerary/R:OriginDestinationOptions/R:OriginDestinationOption/R:FlightSegment/R:MarketingAirline', engine.nsUri).attr('Code').value()
                 });
 
                 return flightGroup;
@@ -373,4 +375,4 @@ let isPTCTypeMatch = function(messageNodes) {
     return true;
 }
 
-module.exports = new SabreFlights();
+module.exports = SabreFlights;

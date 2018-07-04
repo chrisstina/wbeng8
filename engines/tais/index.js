@@ -1,7 +1,7 @@
 const rp = require('request-promise-native'),
     xmljs = require('libxmljs');
 
-const basicProvider = new require('./../../core/provider')(),
+const basicEngine = require('./../../core/engine'),
     env = require('./../../utils/environment')(),
     scbsKit = require('../../utils/scbsKit'),
     tokenCrypt = require('./../../core/tokenCrypt');
@@ -24,21 +24,19 @@ const gds = {
     '1M': 'SIAM'
 }
 
-var TaisProvider = function () {
+var TaisEngine = function () {
 };
 
-var self = this;
+TaisEngine.prototype.basicEngine = basicEngine;
+TaisEngine.prototype.name = 'Tais';
+TaisEngine.prototype.nsUri = nsUri;
+TaisEngine.prototype.ignoredLocations = ["SIP"];
 
-TaisProvider.prototype.code = 'TA';
-TaisProvider.prototype.name = 'Tais';
-TaisProvider.prototype.nsUri = nsUri;
-TaisProvider.prototype.ignoredLocations = ["SIP"];
-
-TaisProvider.prototype.getGDS = (code) => {
+TaisEngine.prototype.getGDS = (code) => {
     return (gds[code] !== undefined) ? gds[code] : '';
 };
 
-TaisProvider.prototype.getPaxType = function (code) {
+TaisEngine.prototype.getPaxType = function (code) {
     switch (code) {
         case 'ADULT':
             return 'ADT';
@@ -61,7 +59,7 @@ TaisProvider.prototype.getPaxType = function (code) {
     }
 };
 
-TaisProvider.prototype.getPaxPair = function (code) {
+TaisEngine.prototype.getPaxPair = function (code) {
     switch (code) {
         case 'ADULT':
             return {
@@ -102,7 +100,7 @@ TaisProvider.prototype.getPaxPair = function (code) {
     }
 };
 
-TaisProvider.prototype.getSystemPax = function (code) {
+TaisEngine.prototype.getSystemPax = function (code) {
     switch (code) {
         case 'ADT':
             return 'ADULT';
@@ -125,7 +123,7 @@ TaisProvider.prototype.getSystemPax = function (code) {
     }
 };
 
-TaisProvider.prototype.getSystemDoc = function (code) {
+TaisEngine.prototype.getSystemDoc = function (code) {
     switch (code) {
         case 'PS':
             return 'INTERNAL';
@@ -163,7 +161,7 @@ TaisProvider.prototype.getSystemDoc = function (code) {
  * @param requestHeaders
  * @returns Request
  */
-TaisProvider.prototype.request = function (requestBody, parseCallback, profileConfig, parameters) {
+TaisEngine.prototype.request = function (requestBody, parseCallback, profileConfig, parameters) {
     const requestOptions = {
         method: "POST",
         rejectUnauthorized: false, // иначе ошибка self signed certificate
@@ -191,7 +189,7 @@ TaisProvider.prototype.request = function (requestBody, parseCallback, profileCo
  * @param profileConfig
  * @returns {*}
  */
-TaisProvider.prototype.wrapRequest = (xmlBody, profileConfig) => {
+TaisEngine.prototype.wrapRequest = (xmlBody, profileConfig) => {
     let xmlRequestWrapDocument = new xmljs.Document();
 
     xmlBody.root().attr({CustomerID: profileConfig.customerID});
@@ -204,13 +202,13 @@ TaisProvider.prototype.wrapRequest = (xmlBody, profileConfig) => {
     return xmlRequestWrapDocument.toString();
 };
 
-TaisProvider.prototype.parseItineraries = (itineraryOptions, sessionID, shopOptionID, shopOption) => {
+TaisEngine.prototype.parseItineraries = (itineraryOptions, sessionID, shopOptionID, shopOption) => {
     let itineraries = [],
         itineraryID,
         order, i;
 
     for (i = 0; i < itineraryOptions.length; i++) {
-        itineraryID = basicProvider.getNodeAttr(itineraryOptions[i], 'ItineraryRef');
+        itineraryID = basicEngine.getNodeAttr(itineraryOptions[i], 'ItineraryRef');
         order = parseInt(itineraryOptions[i].attr('ODRef').value());
         if (!itineraries[order]) {
             itineraries[order] = {
@@ -223,7 +221,7 @@ TaisProvider.prototype.parseItineraries = (itineraryOptions, sessionID, shopOpti
                 code: sessionID + '|' + shopOptionID + '|' + itineraryID,
                 carriers: parseFareCarriers(itineraryOptions[i].find('SIG:FlightSegment', nsUri))
             }),
-            seatsAvailable: parseInt(basicProvider.getNodeAttr(itineraryOptions[i], 'SeatsAvailable')),
+            seatsAvailable: parseInt(basicEngine.getNodeAttr(itineraryOptions[i], 'SeatsAvailable')),
             segments: parseSegments(itineraryOptions[i].find('SIG:FlightSegment', nsUri), shopOption)
         });
     }
@@ -235,12 +233,12 @@ let parseFares = function (Fares, zzTaxes, parameters) {
     var len = Fares.length;
     for(i = 0; i < len; i++) {
         Fare = scbsKit.getFareSeat();
-        Fare.passengerType = this.getSystemPax(basicProvider.getNodeAttr(Fares[i].get('SIG:PaxType', nsUri), 'AgeCat'));
-        Fare.count = parseInt(basicProvider.getNodeAttr(Fares[i].get('SIG:PaxType', nsUri), 'Count'));
-        amount = (parseFloat(basicProvider.getNodeAttr(Fares[i].get('SIG:Price', nsUri), 'EquivFare'))
-            || parseFloat(basicProvider.getNodeAttr(Fares[i].get('SIG:Price', nsUri), 'BaseFare')));
-        responseCurrency = basicProvider.getNodeAttr(Fares[i].get('SIG:Price', nsUri), 'Currency')
-            || basicProvider.getNodeAttr(Fares[i].get('SIG:Price', nsUri), 'BaseCurrency');
+        Fare.passengerType = this.getSystemPax(basicEngine.getNodeAttr(Fares[i].get('SIG:PaxType', nsUri), 'AgeCat'));
+        Fare.count = parseInt(basicEngine.getNodeAttr(Fares[i].get('SIG:PaxType', nsUri), 'Count'));
+        amount = (parseFloat(basicEngine.getNodeAttr(Fares[i].get('SIG:Price', nsUri), 'EquivFare'))
+            || parseFloat(basicEngine.getNodeAttr(Fares[i].get('SIG:Price', nsUri), 'BaseFare')));
+        responseCurrency = basicEngine.getNodeAttr(Fares[i].get('SIG:Price', nsUri), 'Currency')
+            || basicEngine.getNodeAttr(Fares[i].get('SIG:Price', nsUri), 'BaseCurrency');
 
         Fare.prices[0] = scbsKit.getPrice(
             'TARIFF',
@@ -253,8 +251,8 @@ let parseFares = function (Fares, zzTaxes, parameters) {
 
         Taxes = Fares[i].find('SIG:Taxes/SIG:Tax', nsUri);
         for (j = 0; j < Taxes.length; j++) {
-            amount = parseFloat(basicProvider.getNodeAttr(Taxes[j], 'Amount'));
-            code = basicProvider.getNodeAttr(Taxes[j], 'TicketCode');
+            amount = parseFloat(basicEngine.getNodeAttr(Taxes[j], 'Amount'));
+            code = basicEngine.getNodeAttr(Taxes[j], 'TicketCode');
             price = scbsKit.getPrice(
                 'TAXES',
                 code,
@@ -277,16 +275,16 @@ let parseTicketFares = function (Ticket) {
     var Taxes, i, j, amount, code, price;
 
     var Fare = scbsKit.getFareSeat();
-    Fare.passengerType = this.getSystemPax(basicProvider.getNodeAttr(Ticket.get('SIG:TicketData/SIG:Passenger', nsUri), 'AgeCat'));
+    Fare.passengerType = this.getSystemPax(basicEngine.getNodeAttr(Ticket.get('SIG:TicketData/SIG:Passenger', nsUri), 'AgeCat'));
     Fare.count = 1;
-    amount = (parseFloat(basicProvider.getNodeAttr(Ticket.get('SIG:TicketData/SIG:Price', nsUri), 'EquivFare'))
-        || parseFloat(basicProvider.getNodeAttr(Ticket.get('SIG:TicketData/SIG:Price', nsUri), 'BaseFare')));
+    amount = (parseFloat(basicEngine.getNodeAttr(Ticket.get('SIG:TicketData/SIG:Price', nsUri), 'EquivFare'))
+        || parseFloat(basicEngine.getNodeAttr(Ticket.get('SIG:TicketData/SIG:Price', nsUri), 'BaseFare')));
     Fare.prices[0] = scbsKit.getPrice('TARIFF', '', amount);
 
     Taxes = Ticket.find('SIG:TicketData/SIG:Taxes/SIG:Tax', nsUri);
     for(j = 0; j < Taxes.length; j++) {
-        amount = parseFloat(basicProvider.getNodeAttr(Taxes[j], 'Amount'));
-        code = basicProvider.getNodeAttr(Taxes[j], 'TicketCode');
+        amount = parseFloat(basicEngine.getNodeAttr(Taxes[j], 'Amount'));
+        code = basicEngine.getNodeAttr(Taxes[j], 'TicketCode');
         price = scbsKit.getPrice('TAXES', code, amount);
         Fare.prices.push(price);
     }
@@ -297,17 +295,17 @@ let parseTicketFares = function (Ticket) {
 let parsePassenger = function (passengerNode) {
     var passenger = scbsKit.getPassenger();
 
-    passenger.passport.firstName = basicProvider.getNodeAttr(passengerNode, 'FirstName');
-    passenger.passport.lastName = basicProvider.getNodeAttr(passengerNode, 'LastName');
-    passenger.passport.citizenship.code = basicProvider.getNodeAttr(passengerNode, 'DocCountry');
-    passenger.passport.expired = basicProvider.getNodeAttr(passengerNode, 'DocExpiration');
-    passenger.passport.number = basicProvider.getNodeAttr(passengerNode, 'DocNumber');
-    passenger.passport.type = this.getSystemDoc(basicProvider.getNodeAttr(passengerNode, 'DocType'));
-    passenger.passport.birthday = basicProvider.getNodeAttr(passengerNode, 'DOB');
-    passenger.passport.gender = (basicProvider.getNodeAttr(passengerNode, 'Title') === 'MR' ? 'MALE' : 'FEMALE');
-    passenger.type = this.getSystemPax(basicProvider.getNodeAttr(passengerNode, 'AgeType'));
-    //passenger.countryCode = basicProvider.getNodeAttr(passengerNode, 'countryCode');
-    //passenger.areaCode = basicProvider.getNodeAttr(passengerNode, 'areaCode');
+    passenger.passport.firstName = basicEngine.getNodeAttr(passengerNode, 'FirstName');
+    passenger.passport.lastName = basicEngine.getNodeAttr(passengerNode, 'LastName');
+    passenger.passport.citizenship.code = basicEngine.getNodeAttr(passengerNode, 'DocCountry');
+    passenger.passport.expired = basicEngine.getNodeAttr(passengerNode, 'DocExpiration');
+    passenger.passport.number = basicEngine.getNodeAttr(passengerNode, 'DocNumber');
+    passenger.passport.type = this.getSystemDoc(basicEngine.getNodeAttr(passengerNode, 'DocType'));
+    passenger.passport.birthday = basicEngine.getNodeAttr(passengerNode, 'DOB');
+    passenger.passport.gender = (basicEngine.getNodeAttr(passengerNode, 'Title') === 'MR' ? 'MALE' : 'FEMALE');
+    passenger.type = this.getSystemPax(basicEngine.getNodeAttr(passengerNode, 'AgeType'));
+    //passenger.countryCode = basicEngine.getNodeAttr(passengerNode, 'countryCode');
+    //passenger.areaCode = basicEngine.getNodeAttr(passengerNode, 'areaCode');
     return passenger;
 };
 
@@ -320,30 +318,30 @@ let parseSegments = function (FlightSegments, ShopOption){
 
     for(var i = 0; i < len; i++) {
 
-        var reservationRef = basicProvider.getNodeAttr(FlightSegments[i].get('SIG:ReservationDetails/SIG:Reservation', nsUri), 'ReservationRef');
-        var segmentID = basicProvider.getNodeAttr(FlightSegments[i], 'FlightRef');
+        var reservationRef = basicEngine.getNodeAttr(FlightSegments[i].get('SIG:ReservationDetails/SIG:Reservation', nsUri), 'ReservationRef');
+        var segmentID = basicEngine.getNodeAttr(FlightSegments[i], 'FlightRef');
 
         segment = scbsKit.getSegment();
 
-        segment.serviceClass = basicProvider.getNodeAttr(FlightSegments[i].get('SIG:ReservationDetails/SIG:Reservation', nsUri), 'Cabin');
-        segment.bookingClass = basicProvider.getNodeAttr(FlightSegments[i].get('SIG:ReservationDetails/SIG:Reservation', nsUri), 'RBD');
-        segment.flightNumber = basicProvider.getNodeAttr(FlightSegments[i], 'Flight');
-        segment.travelDuration = (Date.parse(basicProvider.getNodeAttr(FlightSegments[i].get('SIG:Arrival', nsUri), 'Time'))
-            - Date.parse(basicProvider.getNodeAttr(FlightSegments[i].get('SIG:Departure', nsUri), 'Time'))) / 60000;
-        segment.regLocator = basicProvider.getNodeAttr(FlightSegments[i].get('SIG:ReservationDetails/SIG:Reservation', nsUri), 'AirlineRecordLocator');
-        segment.operatingCarrier.code = basicProvider.getNodeAttr(FlightSegments[i].get('SIG:OperatingAirline', nsUri), 'Airline', '');
-        segment.carrier.code = segment.operatingCarrier.code !== '' ? segment.operatingCarrier.code : basicProvider.getNodeAttr(FlightSegments[i], 'Airline');
-        segment.equipment.code = basicProvider.getNodeAttr(FlightSegments[i], 'Equipment');
-        segment.locationBegin.code = basicProvider.getNodeAttr(FlightSegments[i].get('SIG:Departure', nsUri), 'Airport');
-        segment.cityBegin.code = basicProvider.getNodeAttr(FlightSegments[i].get('SIG:Departure', nsUri), 'City');
-        segment.locationEnd.code = basicProvider.getNodeAttr(FlightSegments[i].get('SIG:Arrival', nsUri), 'Airport');
-        segment.cityEnd.code = basicProvider.getNodeAttr(FlightSegments[i].get('SIG:Arrival', nsUri), 'City');
-        segment.dateBegin = basicProvider.getNodeAttr(FlightSegments[i].get('SIG:Departure', nsUri), 'Time');
-        segment.dateEnd = basicProvider.getNodeAttr(FlightSegments[i].get('SIG:Arrival', nsUri), 'Time');
-        segment.terminalBegin = basicProvider.getNodeAttr(FlightSegments[i].get('SIG:Departure', nsUri), 'Terminal');
-        segment.terminalEnd = basicProvider.getNodeAttr(FlightSegments[i].get('SIG:Arrival', nsUri), 'Terminal');
+        segment.serviceClass = basicEngine.getNodeAttr(FlightSegments[i].get('SIG:ReservationDetails/SIG:Reservation', nsUri), 'Cabin');
+        segment.bookingClass = basicEngine.getNodeAttr(FlightSegments[i].get('SIG:ReservationDetails/SIG:Reservation', nsUri), 'RBD');
+        segment.flightNumber = basicEngine.getNodeAttr(FlightSegments[i], 'Flight');
+        segment.travelDuration = (Date.parse(basicEngine.getNodeAttr(FlightSegments[i].get('SIG:Arrival', nsUri), 'Time'))
+            - Date.parse(basicEngine.getNodeAttr(FlightSegments[i].get('SIG:Departure', nsUri), 'Time'))) / 60000;
+        segment.regLocator = basicEngine.getNodeAttr(FlightSegments[i].get('SIG:ReservationDetails/SIG:Reservation', nsUri), 'AirlineRecordLocator');
+        segment.operatingCarrier.code = basicEngine.getNodeAttr(FlightSegments[i].get('SIG:OperatingAirline', nsUri), 'Airline', '');
+        segment.carrier.code = segment.operatingCarrier.code !== '' ? segment.operatingCarrier.code : basicEngine.getNodeAttr(FlightSegments[i], 'Airline');
+        segment.equipment.code = basicEngine.getNodeAttr(FlightSegments[i], 'Equipment');
+        segment.locationBegin.code = basicEngine.getNodeAttr(FlightSegments[i].get('SIG:Departure', nsUri), 'Airport');
+        segment.cityBegin.code = basicEngine.getNodeAttr(FlightSegments[i].get('SIG:Departure', nsUri), 'City');
+        segment.locationEnd.code = basicEngine.getNodeAttr(FlightSegments[i].get('SIG:Arrival', nsUri), 'Airport');
+        segment.cityEnd.code = basicEngine.getNodeAttr(FlightSegments[i].get('SIG:Arrival', nsUri), 'City');
+        segment.dateBegin = basicEngine.getNodeAttr(FlightSegments[i].get('SIG:Departure', nsUri), 'Time');
+        segment.dateEnd = basicEngine.getNodeAttr(FlightSegments[i].get('SIG:Arrival', nsUri), 'Time');
+        segment.terminalBegin = basicEngine.getNodeAttr(FlightSegments[i].get('SIG:Departure', nsUri), 'Terminal');
+        segment.terminalEnd = basicEngine.getNodeAttr(FlightSegments[i].get('SIG:Arrival', nsUri), 'Terminal');
         if (ShopOption !== undefined) {
-            segment.fareBasis = basicProvider.getNodeAttr(ShopOption.get('SIG:FareInfo/SIG:Fares/SIG:Fare/SIG:Itinerary/SIG:FlightSegmentDetails[contains(@ReservationRefs, "' + reservationRef + '")]', nsUri), 'FareBasis');
+            segment.fareBasis = basicEngine.getNodeAttr(ShopOption.get('SIG:FareInfo/SIG:Fares/SIG:Fare/SIG:Itinerary/SIG:FlightSegmentDetails[contains(@ReservationRefs, "' + reservationRef + '")]', nsUri), 'FareBasis');
         }
 
         if(trainMark.indexOf(segment.equipment.code) != -1) {
@@ -363,15 +361,15 @@ let parseSegments = function (FlightSegments, ShopOption){
 let parseFareCarriers = function (FlightSegments) {
     var fareCarriers = [];
     for (var i in FlightSegments) {
-        fareCarriers.push(basicProvider.getNodeAttr(FlightSegments[i], 'Airline') + basicProvider.getNodeAttr(FlightSegments[i], 'Flight'));
+        fareCarriers.push(basicEngine.getNodeAttr(FlightSegments[i], 'Airline') + basicEngine.getNodeAttr(FlightSegments[i], 'Flight'));
     }
     return fareCarriers;
 };
 
 let parse = (parseCallback, body, profileConfig, parameters) => {
-    return basicProvider.parse(parseCallback, body, profileConfig, parameters);
+    return basicEngine.parse(parseCallback, body, profileConfig, parameters);
 };
 
-TaisProvider.prototype.parseFares = parseFares;
+TaisEngine.prototype.parseFares = parseFares;
 
-module.exports = new TaisProvider();
+module.exports = new TaisEngine();

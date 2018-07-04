@@ -1,6 +1,6 @@
 const fs = require('fs');
 
-const basicProvider = new require('./provider')(),
+const basicEngine = require('./engine'),
     profilesDir = __dirname + '/../profiles';
 
 module.exports = () => {
@@ -106,7 +106,7 @@ module.exports = () => {
             }
 
             // добавляем общие настройки провайдера (например, код)
-            let provider = basicProvider.getByDirectory(providerName);
+            let provider = basicEngine.getByDirectory(providerName);
             if (provider !== null) {
                 profiles[profileName][providerName]['providerSettings'] = provider; // берем все из конфига по провайдеру
             }

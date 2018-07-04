@@ -1,13 +1,16 @@
-const provider = require('./../portbilet'),
+const provider = require('../index'),
     scbsKit = require('../../../utils/scbsKit'),
     tokenCrypt = require('./../../../core/tokenCrypt');
 
 const xmljs = require('libxmljs');
 
-var PortbiletFlights = function () {
+var engine;
+
+var PortbiletFlights = function (operationEngine) {
+    engine = operationEngine;
 };
 /**
- * Запросо для поиска вариантов перелета
+ * Запрос для поиска вариантов перелета
  *
  * @param {type} context
  * @param {type} parameters
@@ -157,4 +160,4 @@ let parseFlightsResponse = function (xmlDoc, profileConfig, parameters) {
     return solutions;
 };
 
-module.exports = new PortbiletFlights();
+module.exports = PortbiletFlights;

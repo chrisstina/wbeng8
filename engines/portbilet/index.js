@@ -1,7 +1,7 @@
 const rp = require('request-promise-native'),
     xmljs = require('libxmljs');
 
-const basicProvider = new require('./../../core/provider')(),
+const basicEngine = require('./../../core/engine'),
     customTax = require('../../utils/scbsCustomTax'),
     translit = require('transliteration.cyr');
 
@@ -16,12 +16,13 @@ const nsUriRequest = {
     'xmlns:ns1': 'http://ws2.vip.server.xtrip.gridnine.com/'
 };
 
-var PortbiletProvider = function () {
+var PortbiletEngine = function () {
 };
 
-PortbiletProvider.prototype.nsUri = nsUri;
+PortbiletEngine.prototype.basicEngine = basicEngine;
+PortbiletEngine.prototype.nsUri = nsUri;
 
-PortbiletProvider.prototype.wrapRequest = (xmlBody, profileConfig) => {
+PortbiletEngine.prototype.wrapRequest = (xmlBody, profileConfig) => {
     xmlBody.root()
         .node('context')
         .node('locale').text('en')
@@ -51,7 +52,7 @@ PortbiletProvider.prototype.wrapRequest = (xmlBody, profileConfig) => {
  * @param requestHeaders
  * @returns Request
  */
-PortbiletProvider.prototype.request = function (requestBody, parseCallback, profileConfig, parameters, requestHeaders = {}) {
+PortbiletEngine.prototype.request = function (requestBody, parseCallback, profileConfig, parameters, requestHeaders = {}) {
     const headers = {
         'Content-Type': 'text/xml',
         'Domain': profileConfig.connection.domain
@@ -72,47 +73,47 @@ PortbiletProvider.prototype.request = function (requestBody, parseCallback, prof
     return rp.post(requestOptions);
 };
 
-PortbiletProvider.prototype.parsePassenger = function (passengerNode) {
+PortbiletEngine.prototype.parsePassenger = function (passengerNode) {
     return {
         passport: {
-            firstName: basicProvider.getNodeText(passengerNode, 'passport/firstName'),
-            lastName: basicProvider.getNodeText(passengerNode, 'passport/lastName'),
-            middleName: basicProvider.getNodeText(passengerNode, 'passport/middleName'),
+            firstName: basicEngine.getNodeText(passengerNode, 'passport/firstName'),
+            lastName: basicEngine.getNodeText(passengerNode, 'passport/lastName'),
+            middleName: basicEngine.getNodeText(passengerNode, 'passport/middleName'),
             citizenship: {
-                code: basicProvider.getNodeText(passengerNode, 'passport/citizenship/code'),
-                name: basicProvider.getNodeText(passengerNode, 'passport/citizenship/name')
+                code: basicEngine.getNodeText(passengerNode, 'passport/citizenship/code'),
+                name: basicEngine.getNodeText(passengerNode, 'passport/citizenship/name')
             },
-            issued: basicProvider.getNodeText(passengerNode, 'passport/issued'),
-            expired: basicProvider.getNodeText(passengerNode, 'passport/expired'),
-            number: basicProvider.getNodeText(passengerNode, 'passport/number'),
-            type: basicProvider.getNodeText(passengerNode, 'passport/type'),
-            birthday: basicProvider.getNodeText(passengerNode, 'passport/birthday'),
-            gender: basicProvider.getNodeText(passengerNode, 'passport/gender')
+            issued: basicEngine.getNodeText(passengerNode, 'passport/issued'),
+            expired: basicEngine.getNodeText(passengerNode, 'passport/expired'),
+            number: basicEngine.getNodeText(passengerNode, 'passport/number'),
+            type: basicEngine.getNodeText(passengerNode, 'passport/type'),
+            birthday: basicEngine.getNodeText(passengerNode, 'passport/birthday'),
+            gender: basicEngine.getNodeText(passengerNode, 'passport/gender')
         },
-        type: basicProvider.getNodeText(passengerNode, 'type'),
-        phoneType: basicProvider.getNodeText(passengerNode, 'phoneType'),
-        phoneNumber: basicProvider.getNodeText(passengerNode, 'phoneNumber'),
-        countryCode: basicProvider.getNodeText(passengerNode, 'countryCode'),
-        areaCode: basicProvider.getNodeText(passengerNode, 'areaCode')
+        type: basicEngine.getNodeText(passengerNode, 'type'),
+        phoneType: basicEngine.getNodeText(passengerNode, 'phoneType'),
+        phoneNumber: basicEngine.getNodeText(passengerNode, 'phoneNumber'),
+        countryCode: basicEngine.getNodeText(passengerNode, 'countryCode'),
+        areaCode: basicEngine.getNodeText(passengerNode, 'areaCode')
     };
 };
 
-PortbiletProvider.prototype.parseCodeNamePair = function (codeNameNode) {
+PortbiletEngine.prototype.parseCodeNamePair = function (codeNameNode) {
     return {
-        code: basicProvider.getNodeText(codeNameNode, 'code'),
-        name: basicProvider.getNodeText(codeNameNode, 'name')
+        code: basicEngine.getNodeText(codeNameNode, 'code'),
+        name: basicEngine.getNodeText(codeNameNode, 'name')
     }
 };
 
-PortbiletProvider.prototype.getNodeText = function (node, text) {
+PortbiletEngine.prototype.getNodeText = function (node, text) {
     return (node && node.get(text) ? node.get(text).text() : '');
 };
 
-PortbiletProvider.prototype.parseItineraries = function (segmentNodes) {
+PortbiletEngine.prototype.parseItineraries = function (segmentNodes) {
     var itineraries = [],
         k = -1;
     for (var j = 0; j < segmentNodes.length; j++) {
-        if ((j === 0) || (basicProvider.getNodeText(segmentNodes[j], 'starting') === 'true')) {
+        if ((j === 0) || (basicEngine.getNodeText(segmentNodes[j], 'starting') === 'true')) {
             itineraries[++k] = {
                 token: "-",
                 flights: [
@@ -124,12 +125,12 @@ PortbiletProvider.prototype.parseItineraries = function (segmentNodes) {
             };
         }
         var segm = {
-            token: basicProvider.getNodeText(segmentNodes[j].get('fareInfos/fareInfos'), 'remarksSearchContext'),
-            serviceClass: translit.transliterate(basicProvider.getNodeText(segmentNodes[j], 'serviceClass')),
-            bookingClass: translit.transliterate(basicProvider.getNodeText(segmentNodes[j], 'bookingClass')),
-            flightNumber: basicProvider.getNodeText(segmentNodes[j], 'flightNumber'),
-            travelDuration: basicProvider.getNodeText(segmentNodes[j], 'travelDuration'),
-            regLocator: basicProvider.getNodeText(segmentNodes[j], 'airlineLocator'),
+            token: basicEngine.getNodeText(segmentNodes[j].get('fareInfos/fareInfos'), 'remarksSearchContext'),
+            serviceClass: translit.transliterate(basicEngine.getNodeText(segmentNodes[j], 'serviceClass')),
+            bookingClass: translit.transliterate(basicEngine.getNodeText(segmentNodes[j], 'bookingClass')),
+            flightNumber: basicEngine.getNodeText(segmentNodes[j], 'flightNumber'),
+            travelDuration: basicEngine.getNodeText(segmentNodes[j], 'travelDuration'),
+            regLocator: basicEngine.getNodeText(segmentNodes[j], 'airlineLocator'),
             carrier: this.parseCodeNamePair(segmentNodes[j].get('airline')),
             equipment: this.parseCodeNamePair(segmentNodes[j].get('board')),
             locationBegin: this.parseCodeNamePair(segmentNodes[j].get('locationBegin')),
@@ -138,16 +139,16 @@ PortbiletProvider.prototype.parseItineraries = function (segmentNodes) {
             locationEnd: this.parseCodeNamePair(segmentNodes[j].get('locationEnd')),
             cityEnd: this.parseCodeNamePair(segmentNodes[j].get('cityEnd')),
             countryEnd: this.parseCodeNamePair(segmentNodes[j].get('countryEnd')),
-            dateBegin: basicProvider.getNodeText(segmentNodes[j], 'dateBegin'),
-            dateEnd: basicProvider.getNodeText(segmentNodes[j], 'dateEnd'),
-            terminalBegin: basicProvider.getNodeText(segmentNodes[j], 'terminalBegin'),
-            terminalEnd: basicProvider.getNodeText(segmentNodes[j], 'terminalEnd'),
-            fareBasis: basicProvider.getNodeText(segmentNodes[j].get('fareInfos/fareInfos'), 'fareBasis'),
+            dateBegin: basicEngine.getNodeText(segmentNodes[j], 'dateBegin'),
+            dateEnd: basicEngine.getNodeText(segmentNodes[j], 'dateEnd'),
+            terminalBegin: basicEngine.getNodeText(segmentNodes[j], 'terminalBegin'),
+            terminalEnd: basicEngine.getNodeText(segmentNodes[j], 'terminalEnd'),
+            fareBasis: basicEngine.getNodeText(segmentNodes[j].get('fareInfos/fareInfos'), 'fareBasis'),
             methLocomotion: 'AVIA',
             baggage: {
                 type: '',
                 allow: '',
-                value: basicProvider.getNodeText(segmentNodes[j], 'baggageWeightLimit')
+                value: basicEngine.getNodeText(segmentNodes[j], 'baggageWeightLimit')
             }
         };
         if(segm.baggage.value) {
@@ -162,7 +163,7 @@ PortbiletProvider.prototype.parseItineraries = function (segmentNodes) {
     return itineraries;
 };
 
-PortbiletProvider.prototype.codeToPTC = function (code) {
+PortbiletEngine.prototype.codeToPTC = function (code) {
     switch (code) {
         case 'ADULT':
         case 'YOUTH':
@@ -180,13 +181,13 @@ PortbiletProvider.prototype.codeToPTC = function (code) {
     }
 };
 
-PortbiletProvider.prototype.parseFares = function (priceNodes, seats, numseg, config) {
+PortbiletEngine.prototype.parseFares = function (priceNodes, seats, numseg, config) {
     var fareSeatCodes = [],
         fareSeats = [],
         fareTotal = 0;
 
     for (var j = 0; j < priceNodes.length; j++) {
-        var ptc = PortbiletProvider.prototype.codeToPTC(basicProvider.getNodeText(priceNodes[j], 'passengerType'));
+        var ptc = PortbiletEngine.prototype.codeToPTC(basicEngine.getNodeText(priceNodes[j], 'passengerType'));
         if (!fareSeatCodes.hasOwnProperty(ptc)) {
             k = Object.keys(fareSeatCodes).length;
             fareSeatCodes[ptc] = k;
@@ -207,8 +208,8 @@ PortbiletProvider.prototype.parseFares = function (priceNodes, seats, numseg, co
         }
 
         fareSeats[k].prices.push({
-            elementType: basicProvider.getNodeText(priceNodes[j], 'elementType'),
-            amount: parseInt(basicProvider.getNodeText(priceNodes[j], 'amount'))
+            elementType: basicEngine.getNodeText(priceNodes[j], 'elementType'),
+            amount: parseInt(basicEngine.getNodeText(priceNodes[j], 'amount'))
         });
 
         fareTotal += parseInt(fareSeats[k].count) * parseInt(priceNodes[j].get('amount').text());
@@ -257,7 +258,7 @@ PortbiletProvider.prototype.parseFares = function (priceNodes, seats, numseg, co
  * @returns {*}
  */
 let parse = (parseCallback, body, profileConfig, parameters) => {
-    return basicProvider.parse(parseCallback, body, profileConfig, parameters, parseError);
+    return basicEngine.parse(parseCallback, body, profileConfig, parameters, parseError);
 };
 
 let parseError = function (xmlDoc) {
@@ -273,4 +274,4 @@ let parseError = function (xmlDoc) {
     return '';
 }
 
-module.exports = new PortbiletProvider();
+module.exports = new PortbiletEngine();

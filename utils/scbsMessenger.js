@@ -302,6 +302,22 @@ var scbsMessenger = (function() {
 		
 		return outmes;
 	};
+
+    /**
+	 *
+     * @param message
+     * @param source
+	 * @param type
+     * @return {{type: string, source: string, message: *}}
+     */
+    scbsMessenger.prototype.getMessage = function (message, source = 'WBENG', type = 'ERROR') {
+		return {
+			type: type,
+			source: source,
+			message: message
+		};
+    };
+
 	return new scbsMessenger();
 })();
 module.exports = scbsMessenger;

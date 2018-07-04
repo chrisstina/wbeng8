@@ -52,21 +52,11 @@ module.exports.errorResponse = function (e) {
             message: []
         }
     };
-
-    result.messages.message.push({
-        type: 'ERROR',
-        source: 'WBENG',
-        message: e.stack.split("\n")[0].trim() + ' ' + e.stack.split("\n")[1].trim()
-    });
-
+    result.messages.message.push(scbsMessenger.getMessage(e.stack.split("\n")[0].trim() + ' ' + e.stack.split("\n")[1].trim()));
     try {
         result.messages.message = scbsMessenger.filterMessages(result.messages.message);
     } catch (e) {
-        result.messages.message.push({
-            type: 'ERROR',
-            source: 'SCBSMESSENGER',
-            message: 'scbsMessenger error: ' + e.stack.split("\n")[0].trim() + ' ' + e.stack.split("\n")[1].trim()
-        });
+        result.messages.message.push(scbsMessenger.getMessage('scbsMessenger error: ' + e.stack.split("\n")[0].trim() + ' ' + e.stack.split("\n")[1].trim(), 'SCBSMESSENGER'));
     }
 
     return result;
@@ -97,21 +87,17 @@ module.exports.response = function (result) {
             }
         }
     } catch (e) {
-        result.messages.message.push({
-            type: 'ERROR',
-            source: 'LEGACY',
-            message: 'Legacy error: ' + e.stack.split("\n")[0].trim() + ' ' + e.stack.split("\n")[1].trim()
-        });
+        result.messages.message.push(
+            scbsMessenger.getMessage('Legacy error: ' + e.stack.split("\n")[0].trim() + ' ' + e.stack.split("\n")[1].trim(), 'LEGACY')
+        );
     }
 
     try {
         result.messages.message = scbsMessenger.filterMessages(result.messages.message);
     } catch (e) {
-        result.messages.message.push({
-            type: 'ERROR',
-            source: 'scbsMessenger',
-            message: 'scbsMessenger error: ' + e.stack.split("\n")[0].trim() + ' ' + e.stack.split("\n")[1].trim()
-        });
+        result.messages.message.push(
+            scbsMessenger.getMessage('scbsMessenger error: ' + e.stack.split("\n")[0].trim() + ' ' + e.stack.split("\n")[1].trim(), 'SCBSMESSENGER')
+        );
     }
 
     return result;

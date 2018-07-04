@@ -1,17 +1,18 @@
-const basicProvider = new require('./../../../core/provider')(),
-    currency = require('../../../utils/scbsCurrency'),
+const currency = require('../../../utils/scbsCurrency'),
     customTax = require('../../../utils/scbsCustomTax'),
-    provider = require('./../tais'),
     scbsKit = require('../../../utils/scbsKit'),
     tokenCrypt = require('./../../../core/tokenCrypt');
 
 const xmljs = require('libxmljs');
 
-var TaisFlights = function () {
+var engine;
+
+var TaisFlights = function (operationEngine) {
+    engine = operationEngine;
 };
 
 /**
- * Цепочка запросов для поиска вариантов перелета
+ * Запрос для поиска вариантов перелета
  *
  * @param {type} context
  * @param {type} parameters
@@ -42,8 +43,8 @@ TaisFlights.prototype.execute = function (context, parameters, profileConfig) {
  */
 let getFlights = (profileConfig, parameters) => {
     let xmlBody = buildFlightsRequest(parameters, false);
-    let xmlRequest = provider.wrapRequest(xmlBody, profileConfig);
-    return provider.request(xmlRequest, parseFlightsResponse, profileConfig, parameters);
+    let xmlRequest = engine.wrapRequest(xmlBody, profileConfig);
+    return engine.request(xmlRequest, parseFlightsResponse, profileConfig, parameters);
 };
 
 let buildFlightsRequest = (parameters, allBrands) => {
@@ -73,7 +74,7 @@ let buildFlightsRequest = (parameters, allBrands) => {
     parameters.seats.map((seat) => {
         cursor = cursor.node('PaxType')
                 .attr({Count: seat.count})
-                .attr(provider.getPaxPair(seat.passengerType))
+                .attr(engine.getPaxPair(seat.passengerType))
             .parent();
     });
     cursor = cursor.parent();
@@ -107,8 +108,9 @@ let buildFlightsRequest = (parameters, allBrands) => {
 };
 
 let parseFlightsResponse = (xmlDoc, profileConfig, parameters) => {
-    let shopOptions = xmlDoc.find('//SIG:ShopOption', provider.nsUri),
-        sessionID = basicProvider.getNodeAttr(xmlDoc.get('//SIG:SIG_AirShopRS', provider.nsUri), 'SessionID'),
+    console.log(xmlDoc + '');
+    let shopOptions = xmlDoc.find('//SIG:ShopOption', engine.nsUri),
+        sessionID = engine.basicEngine.getNodeAttr(xmlDoc.get('//SIG:SIG_AirShopRS', engine.nsUri), 'SessionID'),
         solutions = [],
         ruleKeys = [],
         needIgnore = false;
@@ -123,19 +125,19 @@ let parseFlightsResponse = (xmlDoc, profileConfig, parameters) => {
 
     if (parameters.route !== undefined) {
         parameters.route.map((leg) => {
-            needIgnore = needIgnore || (provider.ignoredLocations.indexOf(leg.locationBegin.code)!== -1 ||
-                provider.ignoredLocations.indexOf(leg.locationEnd.code)!== -1);
+            needIgnore = needIgnore || (engine.ignoredLocations.indexOf(leg.locationBegin.code)!== -1 ||
+                engine.ignoredLocations.indexOf(leg.locationEnd.code)!== -1);
         });
     }
 
     for (var i = 0; i < shopOptions.length; i++) {
         let shopOption = shopOptions[i], ruleKeysDesc = [];
 
-        carrier = shopOption.get('SIG:FareInfo/SIG:Fares/SIG:Fare/SIG:TicketStock', provider.nsUri).attr('ValidatingCarrier') ?
-            shopOption.get('SIG:FareInfo/SIG:Fares/SIG:Fare/SIG:TicketStock', provider.nsUri).attr('ValidatingCarrier').value() :
-            shopOption.get('SIG:ItineraryOptions/SIG:ItineraryOption/SIG:FlightSegment', provider.nsUri).attr('Airline').value();
+        carrier = shopOption.get('SIG:FareInfo/SIG:Fares/SIG:Fare/SIG:TicketStock', engine.nsUri).attr('ValidatingCarrier') ?
+            shopOption.get('SIG:FareInfo/SIG:Fares/SIG:Fare/SIG:TicketStock', engine.nsUri).attr('ValidatingCarrier').value() :
+            shopOption.get('SIG:ItineraryOptions/SIG:ItineraryOption/SIG:FlightSegment', engine.nsUri).attr('Airline').value();
 
-        gds = provider.getGDS(shopOption.get('SIG:FareInfo/SIG:Fares/SIG:Fare/SIG:TicketStock', provider.nsUri).attr('CRS').value());
+        gds = engine.getGDS(shopOption.get('SIG:FareInfo/SIG:Fares/SIG:Fare/SIG:TicketStock', engine.nsUri).attr('CRS').value());
 
         // фильтруем по а\к
         if( ! filterFlights(gds, carrier, profileConfig)) {
@@ -147,8 +149,8 @@ let parseFlightsResponse = (xmlDoc, profileConfig, parameters) => {
             continue;
         }
 
-        shopOptionID = basicProvider.getNodeAttr(shopOption, 'OptionRef');
-        ruleKeys = shopOption.find('SIG:FareInfo/SIG:Fares/SIG:Fare/SIG:Rules/SIG:RuleKey', provider.nsUri);
+        shopOptionID = engine.basicEngine.getNodeAttr(shopOption, 'OptionRef');
+        ruleKeys = shopOption.find('SIG:FareInfo/SIG:Fares/SIG:Fare/SIG:Rules/SIG:RuleKey', engine.nsUri);
 
         ruleKeys.map((key, index) => {
             ruleKeysDesc[index] = key.text();
@@ -156,7 +158,7 @@ let parseFlightsResponse = (xmlDoc, profileConfig, parameters) => {
 
         let flightGroup = scbsKit.getFlightGroup();
         flightGroup.token = tokenCrypt.encode({
-            provider: provider.code,
+            provider: profileConfig.providerSettings.code,
             seats: parameters.seats,
             route: parameters.route,
             code: sessionID + '|' + shopOptionID,
@@ -165,22 +167,22 @@ let parseFlightsResponse = (xmlDoc, profileConfig, parameters) => {
         });
         flightGroup.provider = profileConfig.providerSettings.code;
         flightGroup.carrier = { code: carrier };
-        flightGroup.eticket = (shopOption.get('SIG:FareInfo/SIG:Ticketing', provider.nsUri).attr('eTicket').value() === 'true');
-        flightGroup.timeLimit = shopOption.get('SIG:FareInfo/SIG:Ticketing', provider.nsUri).attr('TimeLimit').value();
-        flightGroup.latinRegistration = (shopOption.get('SIG:BookingGuidelines', provider.nsUri).attr('RussianNamesSupported') !== 'true');
+        flightGroup.eticket = (shopOption.get('SIG:FareInfo/SIG:Ticketing', engine.nsUri).attr('eTicket').value() === 'true');
+        flightGroup.timeLimit = shopOption.get('SIG:FareInfo/SIG:Ticketing', engine.nsUri).attr('TimeLimit').value();
+        flightGroup.latinRegistration = (shopOption.get('SIG:BookingGuidelines', engine.nsUri).attr('RussianNamesSupported') !== 'true');
         flightGroup.gds = gds;
-        flightGroup.itineraries = provider.parseItineraries(
-            shopOption.find('SIG:ItineraryOptions/SIG:ItineraryOption', provider.nsUri),
+        flightGroup.itineraries = engine.parseItineraries(
+            shopOption.find('SIG:ItineraryOptions/SIG:ItineraryOption', engine.nsUri),
             sessionID,
             shopOptionID,
             shopOption);
 
         let totalConverted = currency.convertAmount(
-                parseFloat(basicProvider.getNodeAttr(shopOption, 'Total')),
-                basicProvider.getNodeAttr(shopOption, 'Currency'),
+                parseFloat(engine.basicEngine.getNodeAttr(shopOption, 'Total')),
+                engine.basicEngine.getNodeAttr(shopOption, 'Currency'),
                 parameters.currency,
                 null,
-                provider,
+                engine,
                 'flights',
                 null,
                 'TOTAL'),
@@ -189,8 +191,8 @@ let parseFlightsResponse = (xmlDoc, profileConfig, parameters) => {
 
         flightGroup.fares = {
             fareDesc: {},
-            fareSeats: (provider.parseFares(
-                shopOption.find('SIG:FareInfo/SIG:Fares/SIG:Fare', provider.nsUri),
+            fareSeats: (engine.parseFares(
+                shopOption.find('SIG:FareInfo/SIG:Fares/SIG:Fare', engine.nsUri),
                 zzTaxes,
                 parameters)),
             fareTotal: fareTotalWithZZ
@@ -259,4 +261,4 @@ let isCombinedFlight = function(airlines) {
     return airlines.split(' ').length > 1;
 };
 
-module.exports = new TaisFlights();
+module.exports = TaisFlights;

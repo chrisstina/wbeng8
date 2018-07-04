@@ -1,7 +1,7 @@
 const rp = require('request-promise-native'),
     xmljs = require('libxmljs');
 
-const basicProvider = new require('./../../core/provider')();
+const basicEngine = require('./../../core/engine');
 
 /** @todo можно запихнуть в модуль config (экспортить настройки) */
 
@@ -89,11 +89,11 @@ const serviceClass = {
     'ECONOMY': 'Y'
 };
 
-var SabreProvider = function () {
+var SabreEngine = function () {
 };
 
-SabreProvider.prototype.code = '1S';
-SabreProvider.prototype.name = 'SABRE';
+SabreEngine.prototype.name = 'SABRE';
+SabreEngine.prototype.basicEngine = basicEngine;
 
 /**
  *
@@ -104,7 +104,7 @@ SabreProvider.prototype.name = 'SABRE';
  * @param requestHeaders
  * @returns Request
  */
-SabreProvider.prototype.request = function (requestBody, parseCallback, profileConfig, parameters, requestHeaders = {}) {
+SabreEngine.prototype.request = function (requestBody, parseCallback, profileConfig, parameters, requestHeaders = {}) {
     const headers = {
         'Content-Type': 'text/xml',
         'Domain': profileConfig.connection.domain
@@ -134,7 +134,7 @@ SabreProvider.prototype.request = function (requestBody, parseCallback, profileC
  * @param {type} sessionToken
  * @returns Promise
  */
-SabreProvider.prototype.wrapRequest = function (xmlBody, profileConfig, serviceName, actionName, sessionToken = null) {
+SabreEngine.prototype.wrapRequest = function (xmlBody, profileConfig, serviceName, actionName, sessionToken = null) {
     var xmlDoc = xmljs.parseXml(XMLTemplate);
 
     if (sessionToken === null) { // открываем сессию
@@ -159,9 +159,9 @@ SabreProvider.prototype.wrapRequest = function (xmlBody, profileConfig, serviceN
     return xmlDoc.toString();
 };
 
-SabreProvider.prototype.nsUri = nsUri;
+SabreEngine.prototype.nsUri = nsUri;
 
-SabreProvider.prototype.passengerTypes = {
+SabreEngine.prototype.passengerTypes = {
     adult: {title: 'ADULT', ssrType: 'DOCS'},
     child: {title: 'CHILD', ssrType: 'DOCS'},
     youth: {title: 'YOUTH', ssrType: 'DOCS'},
@@ -170,7 +170,7 @@ SabreProvider.prototype.passengerTypes = {
     infantseat: {title: 'WSEATINFANT', ssrType: 'DOCS'}
 };
 
-SabreProvider.prototype.getSeatCode = function (code) {
+SabreEngine.prototype.getSeatCode = function (code) {
     switch (code) {
         case 'ADULT':
             return 'ADT';
@@ -211,12 +211,12 @@ SabreProvider.prototype.getSeatCode = function (code) {
     }
 };
 
-SabreProvider.prototype.getServiceClass = function (classCode) {
+SabreEngine.prototype.getServiceClass = function (classCode) {
     let code = serviceClass[classCode];
     return (code === undefined) ? 'Y' : code;
 };
 
-SabreProvider.prototype.getTitleByCode = function (classCode) {
+SabreEngine.prototype.getTitleByCode = function (classCode) {
     let serviceClassTitles = {
         P: 'PREMIUM',
         F: 'FIRST',
@@ -248,7 +248,7 @@ SabreProvider.prototype.getTitleByCode = function (classCode) {
     return (title === undefined) ? 'ECONOMY' : title;
 };
 
-SabreProvider.prototype.getMethLocomotion = function (equipmentCode) {
+SabreEngine.prototype.getMethLocomotion = function (equipmentCode) {
     switch (equipmentCode) {
         case 'TRN':
         case 'TRAIN':
@@ -276,7 +276,7 @@ SabreProvider.prototype.getMethLocomotion = function (equipmentCode) {
  * @param {type} config
  * @returns {configtimezones.bspCommon|String}
  */
-SabreProvider.prototype.getPCCTimezone = function (config) {
+SabreEngine.prototype.getPCCTimezone = function (config) {
     if (config.timezones !== undefined) {
         return config.timezones['bspCommon'];
     }
@@ -284,7 +284,7 @@ SabreProvider.prototype.getPCCTimezone = function (config) {
 };
 
 /* костыль для SIP, так как временные зоны не совпадают */
-SabreProvider.prototype.getTravelDuration = function(segment) {
+SabreEngine.prototype.getTravelDuration = function(segment) {
     let duration = 0,
         isSIPDeparture = segment.get('R:DepartureAirport', nsUri).attr('LocationCode').value() === 'SIP',
         isSIPArrival = segment.get('R:ArrivalAirport', nsUri).attr('LocationCode').value() === 'SIP';
@@ -318,7 +318,7 @@ SabreProvider.prototype.getTravelDuration = function(segment) {
  * @returns {*}
  */
 let parse = (parseCallback, body, profileConfig, parameters) => {
-    return basicProvider.parse(parseCallback, body, profileConfig, parameters, parseError);
+    return basicEngine.parse(parseCallback, body, profileConfig, parameters, parseError);
 };
 
 let parseError = function (xmlDoc) {
@@ -342,4 +342,4 @@ let getUsernameToken = function (config) {
         '</wsse:UsernameToken>').root();
 };
 
-module.exports = new SabreProvider();
+module.exports = new SabreEngine();

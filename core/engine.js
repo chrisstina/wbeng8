@@ -2,7 +2,7 @@ const config = require('./../config');
 
 const xmljs = require('libxmljs');
 
-module.exports = () => {
+module.exports = (() => {
     return {
         getByCode: (code) => {
             let p = config.providers.find((element) => {
@@ -34,11 +34,11 @@ module.exports = () => {
             let xmlDoc = xmljs.parseXml(body);
             let errorText = parseErrorCallback !== null ? parseErrorCallback(xmlDoc) : '';
 
-            console.log('response' + xmlDoc);
+            /*console.log('response' + xmlDoc);
 
             if (errorText !== '') {  // @todo тут могут быть не только ошибки, оборачивать в messages
                 throw new Error('GDS вернула ошибку ' + errorText);
-            }
+            }*/
 
             return (parseCallback !== null && parseCallback !== undefined) ?
                 parseCallback(xmlDoc, profileConfig, parameters) : {};
@@ -53,4 +53,4 @@ module.exports = () => {
             return (node && node.get(text) ? node.get(text).text() : '');
         }
     };
-}
+})();

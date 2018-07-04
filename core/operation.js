@@ -1,5 +1,5 @@
 const config = require('./../config');
-const relativeDir = '../providers';
+const relativeDir = '../engines';
 
 module.exports = () => {
     var operations = {};
@@ -11,7 +11,9 @@ module.exports = () => {
                 config.operations.map((operation) => {
                     let providerOperationResourceFile = relativeDir + '/' + provider.engine + '/operations/' + operation.name;
                     try {
-                        operations[provider.directory][operation.name] = require(providerOperationResourceFile);
+                        const operationModule = require(providerOperationResourceFile),
+                            engine = require(relativeDir + '/' + provider.engine);
+                        operations[provider.directory][operation.name] = new operationModule(engine);
                     } catch (e) {
                         console.log('Fail ' + providerOperationResourceFile + ' - ' + e.stack);
                     }
