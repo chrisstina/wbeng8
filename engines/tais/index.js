@@ -1,10 +1,8 @@
-const rp = require('request-promise-native'),
-    xmljs = require('libxmljs');
-
 const basicEngine = require('./../../core/engine'),
     env = require('./../../utils/environment')(),
     scbsKit = require('../../utils/scbsKit'),
-    tokenCrypt = require('./../../core/tokenCrypt');
+    tokenCrypt = require('./../../core/tokenCrypt'),
+    xmljs = require('libxmljs');
 
 const nsUri = {
     'SOAP-ENV': 'http://schemas.xmlsoap.org/soap/envelope/',
@@ -162,25 +160,17 @@ TaisEngine.prototype.getSystemDoc = function (code) {
  * @returns Request
  */
 TaisEngine.prototype.request = function (requestBody, parseCallback, profileConfig, parameters) {
-    const requestOptions = {
-        method: "POST",
-        rejectUnauthorized: false, // иначе ошибка self signed certificate
-        uri: profileConfig.connection.url,
-        headers: {
+    return basicEngine.request(
+        profileConfig.connection.url,
+        {
             'Content-Type': 'text/xml',
             'Domain': profileConfig.connection.domain,
             'Authorization': 'Basic ' + new Buffer(profileConfig.connection.username + ':' + profileConfig.connection.password).toString('base64')
         },
-        body: requestBody,
-        timeout: 100000,
-        transform: (body, response, resolveWithFullResponse) => { // оборачиваем метод трансформации, чтобы были видны parameters и profileConfig
-            return parse(parseCallback, body, profileConfig, parameters);
-        }
-    };
-
-    console.log(requestBody); // @todo вывод в файл
-
-    return rp.post(requestOptions);
+        requestBody,
+        parseCallback,
+        profileConfig,
+        parameters);
 };
 
 /**
@@ -364,10 +354,6 @@ let parseFareCarriers = function (FlightSegments) {
         fareCarriers.push(basicEngine.getNodeAttr(FlightSegments[i], 'Airline') + basicEngine.getNodeAttr(FlightSegments[i], 'Flight'));
     }
     return fareCarriers;
-};
-
-let parse = (parseCallback, body, profileConfig, parameters) => {
-    return basicEngine.parse(parseCallback, body, profileConfig, parameters);
 };
 
 TaisEngine.prototype.parseFares = parseFares;

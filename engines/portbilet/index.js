@@ -53,24 +53,16 @@ PortbiletEngine.prototype.wrapRequest = (xmlBody, profileConfig) => {
  * @returns Request
  */
 PortbiletEngine.prototype.request = function (requestBody, parseCallback, profileConfig, parameters, requestHeaders = {}) {
-    const headers = {
-        'Content-Type': 'text/xml',
-        'Domain': profileConfig.connection.domain
-    };
-
-    const requestOptions = {
-        method: "POST",
-        uri: profileConfig.connection.url,
-        headers: Object.assign(requestHeaders, headers),
-        body: requestBody,
-        transform: (body, response, resolveWithFullResponse) => { // оборачиваем метод трансформации, чтобы были видны parameters и profileConfig
-            return parse(parseCallback, body, profileConfig, parameters);
-        }
-    };
-
-    console.log(requestBody); // @todo вывод в файл
-
-    return rp.post(requestOptions);
+    return basicEngine.request(
+        profileConfig.connection.url,
+        {
+            'Content-Type': 'text/xml',
+            'Domain': profileConfig.connection.domain
+        },
+        requestBody,
+        parseCallback,
+        profileConfig,
+        parameters);
 };
 
 PortbiletEngine.prototype.parsePassenger = function (passengerNode) {
