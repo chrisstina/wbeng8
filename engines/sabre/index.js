@@ -98,13 +98,13 @@ SabreEngine.prototype.basicEngine = basicEngine;
 /**
  *
  * @param requestBody
- * @param transformCallback  метод для парсинга ответа
+ * @param {function (xmlDoc, profileConfig, parameters) : Array} parseCallback  метод для парсинга ответа
  * @param profileConfig
  * @param parameters
  * @param requestHeaders
  * @returns Request
  */
-SabreEngine.prototype.request = function (requestBody, parseCallback, profileConfig, parameters, requestHeaders = {}) {
+SabreEngine.prototype.request = function (requestBody, parseCallback, profileConfig, parameters) {
     return basicEngine.request(
         profileConfig.connection.url,
         {
@@ -114,7 +114,8 @@ SabreEngine.prototype.request = function (requestBody, parseCallback, profileCon
         requestBody,
         parseCallback,
         profileConfig,
-        parameters);
+        parameters,
+        parseError);
 };
 
 /**
@@ -295,21 +296,6 @@ SabreEngine.prototype.getTravelDuration = function(segment) {
     }
 
     return duration;
-};
-
-/**
- * Распарсивает XML ответ в нужную структуру.
- * Дополнительно проверяем на наличие ошибок.
- * Логируем. @todo логирование нормальное
- *
- * @param parseCallback
- * @param body
- * @param profileConfig
- * @param parameters
- * @returns {*}
- */
-let parse = (parseCallback, body, profileConfig, parameters) => {
-    return basicEngine.parse(parseCallback, body, profileConfig, parameters, parseError);
 };
 
 let parseError = function (xmlDoc) {

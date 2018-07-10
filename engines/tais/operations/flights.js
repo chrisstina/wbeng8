@@ -25,6 +25,7 @@ TaisFlights.prototype.execute = function (context, parameters, profileConfig) {
 
     return getFlights(profileConfig, parameters)
         .then((flightsList) => {
+            console.timeEnd("TAIS flights executed in");
             return flightsList;
         })
         .catch((err) => {

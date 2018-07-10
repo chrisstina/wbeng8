@@ -8,8 +8,8 @@ const rp = require('request-promise-native'),
  * Дополнительно проверяем на наличие ошибок.
  * Логируем. @todo логирование нормальное
  *
- * @param parseCallback
- * @param body
+ * @param parseCallback :: [xmlDoc, profileConfig, parameters] → Array
+ * @param body raw response text
  * @param profileConfig
  * @param parameters
  * @param parseErrorCallback - опциональный парсер для ошибок
@@ -51,12 +51,13 @@ module.exports = (() => {
          * @param uri
          * @param headers
          * @param requestBody
-         * @param parseCallback
+         * @param {function (xmlDoc, profileConfig, parameters) : Array}  parseCallback
          * @param profileConfig
          * @param parameters
+         * @param {function (xmlDoc, profileConfig, parameters) : Array}  parseErrorCallback - опциональный парсер для ошибок, сначала запускается он
          * @return Request
          */
-        request: function(uri, headers, requestBody, parseCallback, profileConfig, parameters) {
+        request: function(uri, headers, requestBody, parseCallback, profileConfig, parameters, parseErrorCallback) {
             const requestOptions = {
                 rejectUnauthorized: false, // иначе ошибка self signed certificate
                 uri: uri,
@@ -64,7 +65,7 @@ module.exports = (() => {
                 body: requestBody,
                 timeout: 100000,
                 transform: (body, response, resolveWithFullResponse) => { // оборачиваем метод трансформации, чтобы были видны parameters и profileConfig
-                    return parse(parseCallback, body, profileConfig, parameters);
+                    return parse(parseCallback, body, profileConfig, parameters, parseErrorCallback);
                 }
             };
 

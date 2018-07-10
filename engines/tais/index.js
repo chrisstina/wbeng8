@@ -153,7 +153,7 @@ TaisEngine.prototype.getSystemDoc = function (code) {
 /**
  *
  * @param requestBody
- * @param transformCallback  метод для парсинга ответа
+ * @param {function (xmlDoc, profileConfig, parameters) : Array} parseCallback  метод для парсинга ответа
  * @param profileConfig
  * @param parameters
  * @param requestHeaders

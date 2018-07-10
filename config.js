@@ -46,12 +46,12 @@ module.exports = {
             directory: 'portbiletDP',
             engine: 'portbilet'
         },
-        // {
-        //     code: '1G',
-        //     name: 'Galileo',
-        //     directory: 'galileo',
-        //     engine: 'galileo'
-        // },
+        {
+            code: '1G',
+            name: 'TRAVELPORT',
+            directory: 'travelport',
+            engine: 'travelport'
+        },
     ],
     operations: [
         {

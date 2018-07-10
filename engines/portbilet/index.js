@@ -1,9 +1,7 @@
-const rp = require('request-promise-native'),
-    xmljs = require('libxmljs');
-
 const basicEngine = require('./../../core/engine'),
     customTax = require('../../utils/scbsCustomTax'),
-    translit = require('transliteration.cyr');
+    translit = require('transliteration.cyr'),
+    xmljs = require('libxmljs');
 
 const nsUri = {
     'xmlns:S': 'http://schemas.xmlsoap.org/soap/envelope/',
@@ -46,7 +44,7 @@ PortbiletEngine.prototype.wrapRequest = (xmlBody, profileConfig) => {
 /**
  *
  * @param requestBody
- * @param transformCallback  метод для парсинга ответа
+ * @param {function (xmlDoc, profileConfig, parameters) : Array} parseCallback  метод для парсинга ответа
  * @param profileConfig
  * @param parameters
  * @param requestHeaders

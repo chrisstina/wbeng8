@@ -1,11 +1,10 @@
-const currency = require('../../../utils/scbsCurrency'),
+const clone = require('clone'),
+    currency = require('../../../utils/scbsCurrency'),
     customTax = require('../../../utils/scbsCustomTax'),
+    errors = require('request-promise-native/errors'),
     scbsDate = require('../../../utils/scbsDate'),
     scbsKit = require('../../../utils/scbsKit'),
-    tokenCrypt = require('../../../core/tokenCrypt');
-
-const clone = require('clone'),
-    errors = require('request-promise-native/errors'),
+    tokenCrypt = require('../../../core/tokenCrypt'),
     xmljs = require('libxmljs');
 
 var engine;
@@ -41,6 +40,7 @@ SabreFlights.prototype.execute = function (context, parameters, profileConfig) {
                 .catch((err) => {
                     console.error('Session close error: ' + err.message);
                 }); // отправляем запрос на закрытие, и сразу возвращаем результат
+            console.timeEnd("Sabre flights executed in");
             return flightsList;
         })
         .catch((err) => {

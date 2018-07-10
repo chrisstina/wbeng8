@@ -23,6 +23,7 @@ PortbiletFlights.prototype.execute = function (context, parameters, profileConfi
 
     return getFlights(profileConfig, parameters)
         .then((flightsList) => {
+            console.timeEnd("Portbilet flights executed in");
             return flightsList;
         })
         .catch((err) => {
@@ -33,7 +34,7 @@ PortbiletFlights.prototype.execute = function (context, parameters, profileConfi
 
 let getFlights = function (profileConfig, parameters) {
     let xmlBody = buildFlightsRequest(parameters);
-    let xmlRequest = provider.wrapRequest(xmlBody, profileConfig);
+    let xmlRequest = (provider.wrapRequest !== undefined) ? provider.wrapRequest(xmlBody, profileConfig) : xmlBody;
     return provider.request(xmlRequest, parseFlightsResponse, profileConfig, parameters);
 };
 
