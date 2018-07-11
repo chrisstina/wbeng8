@@ -52,6 +52,12 @@ module.exports = {
             directory: 'travelport',
             engine: 'travelport'
         },
+        {
+            code: '2G',
+            name: 'TRAVELPORTKZ',
+            directory: 'travelportKZ',
+            engine: 'travelport'
+        },
     ],
     operations: [
         {

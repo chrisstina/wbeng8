@@ -19,11 +19,11 @@ const parse = function (parseCallback, body, profileConfig, parameters, parseErr
     let xmlDoc = xmljs.parseXml(body);
     let errorText = parseErrorCallback !== null ? parseErrorCallback(xmlDoc) : '';
 
-    /*console.log('response' + xmlDoc);
+    // console.log('response' + xmlDoc);
 
     if (errorText !== '') {  // @todo тут могут быть не только ошибки, оборачивать в messages
-        throw new Error('GDS вернула ошибку ' + errorText);
-    }*/
+        throw new Error('Ошибка от GDS: "' + errorText + '"');
+    }
 
     return (parseCallback !== null && parseCallback !== undefined) ?
         parseCallback(xmlDoc, profileConfig, parameters) : {};

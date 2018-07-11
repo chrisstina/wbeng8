@@ -306,7 +306,7 @@ let parseError = function (xmlDoc) {
     }
 
     return '';
-}
+};
 /**
  * Формирует авторизационный блок xml
  */

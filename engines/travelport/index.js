@@ -113,7 +113,8 @@ TravelportEngine.prototype.request = function (requestBody, parseCallback, profi
         requestBody,
         parseCallback,
         profileConfig,
-        parameters
+        parameters,
+        parseError
     );
 };
 
@@ -292,6 +293,23 @@ TravelportEngine.prototype.getBenefitCode = function (carrierCode, config) {
     }
 
     return code;
+};
+
+let parseError = function (xmlDoc) {
+    let errText = '';
+    errText = xmlDoc.find('//SOAP:Fault/faultstring', nsUri).map(function (fault) {
+        return fault.text();
+    });
+
+    errText = errText + xmlDoc.find('//air:ErrorMessage', nsUri).map(function (fault) {
+        return fault.text();
+    });
+
+    errText = errText + xmlDoc.find('//air:ResponseMessage[@Type="Warning"]', nsUri).map(function (fault) {
+        return fault.text();
+    });
+
+    return errText;
 };
 
 module.exports = new TravelportEngine();
