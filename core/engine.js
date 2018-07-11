@@ -1,5 +1,3 @@
-const config = require('./../config');
-
 const rp = require('request-promise-native'),
     xmljs = require('libxmljs');
 
@@ -31,20 +29,6 @@ const parse = function (parseCallback, body, profileConfig, parameters, parseErr
 
 module.exports = (() => {
     return {
-        getByCode: (code) => {
-            let p = config.providers.find((element) => {
-                return element.code === code;
-            });
-
-            return (p !== undefined) ? p : null;
-        },
-        getByDirectory: (code) => {
-            let p = config.providers.find((element) => {
-                return element.directory === code;
-            });
-
-            return (p !== undefined) ? p : null;
-        },
         /**
          * Отправляет POST запрос
          *

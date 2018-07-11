@@ -1,9 +1,8 @@
-const fs = require('fs');
-
-const basicEngine = require('./engine'),
+const configManager = require('./../utils/configManager'),
+    fs = require('fs'),
     profilesDir = __dirname + '/../profiles';
 
-module.exports = () => {
+module.exports = (() => {
     var profiles = {};
     var loadProfiles = (env) => {
         var profilesList = fs.readdirSync(profilesDir);
@@ -106,7 +105,7 @@ module.exports = () => {
             }
 
             // добавляем общие настройки провайдера (например, код)
-            let provider = basicEngine.getByDirectory(providerName);
+            let provider = configManager.getByDirectory(providerName);
             if (provider !== null) {
                 profiles[profileName][providerName]['providerSettings'] = provider; // берем все из конфига по провайдеру
             }
@@ -114,4 +113,4 @@ module.exports = () => {
             return profiles[profileName][providerName];
         }
     };
-}
+})();

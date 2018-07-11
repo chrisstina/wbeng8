@@ -1,7 +1,7 @@
-module.exports = function (server, profileModule, operationsModule) {
-
+module.exports = function (server) {
+    // @todo брать из конфига и по списку генерить
     server.get('/flights', (req, res, next) => {
-        require('./operations/flights')(req, res, next, profileModule, operationsModule);
+        require('./operations/flights')(req, res, next);
     });
 
     server.get('/price', (req, res, next) => {

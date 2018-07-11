@@ -1,8 +1,8 @@
 const restify = require('restify')
     config = require('./config.js'),
     env = require('./utils/environment')(), // определяем окружение
-    operationModule = new require('./core/operation')(),
-    profileModule = new require('./core/profile')(),
+    operationModule = require('./core/operation'),
+    profileModule = require('./core/profile'),
     userModule = require('./core/user');
 
 profileModule.loadProfiles(env); // загружаем все профайлы
@@ -24,7 +24,7 @@ server.use((req, res, next) => { // добавляем WBToken в context
 server.use((req, res, next) => userModule.authorizeProfile(req, res, next)); // получаем профайл и авторизуем его, профайл лежит в поле userProfile
 
 server.listen(config.port, () => {
-    require('./routes.js')(server, profileModule, operationModule);
+    require('./routes.js')(server);
     console.log('Wbeng API server is listening on port ' + config.port + ' in ' + env + ' environment');
 });
 

@@ -1,36 +1,67 @@
-const clone = require('clone'),
+const configManager = require('./../utils/configManager'),
+    clone = require('clone'),
+    operationModule = require('./../core/operation'),
+    profileModule = require('./../core/profile'),
+    scbsMessenger = require('./../utils/scbsMessenger'),
+    responseFormatter = require('./../utils/scbsResponse'),
     restErrors = require('restify-errors');
 
-const config = require('./../config'),
-    basicEngine = require('./../core/engine'),
-    scbsMessenger = require('./../utils/scbsMessenger'),
-    responseFormatter = require('./../utils/scbsResponse');
-
-let defaultPriority = ['DP', 'S7', 'TS', '1S', '2H', '1H', 'PB', '1G', 'TA'];//'3H', '4H', '5H', '6H', '7H',
-let alternativeFaresAllowed = [ // выводить ли кнопку "Все тарифы"
+const defaultPriority = ['DP', 'S7', 'TS', '1S', '2H', '1H', 'PB', '1G', 'TA'];//'3H', '4H', '5H', '6H', '7H',
+const alternativeFaresAllowed = [ // выводить ли кнопку "Все тарифы"
     { gds: 'SIRENA', carriers: ['UT', 'NN', 'WZ', 'N4', 'IK', '5N', 'Y7', 'SU', 'УТ', 'R3', '2G', 'FV', '6R'] },
     { gds: 'SABRE', carriers: ['*'] },
     { gds: 'GALILEO', carriers: ['*'] },
     { gds: 'AMADEUS', carriers: ['*'] }
 ];
-let operationConfig = config.operations.find((element) => {
-    return element.name === 'flights'
-});
 
-module.exports = (req, res, next, profileModule, operationsModule) => {
+const operationConfig = configManager.getOperationSettings('flights');
+
+module.exports = function (req, res, next) {
+    Promise.all(getSearchRequests(req)) // разом запускаем все запросы поиска
+    .then((results) => {
+        try {
+            res.send(
+                responseFormatter.wrapResponse( // форматируем отсортированный ответ @todo можно вынести куда-то выше
+                    sortSearchResponses(results), // сортируем
+                    operationConfig.exit,
+                    req.params.context.WBtoken,
+                    req.userProfile
+                ));
+            next();
+        } catch (e) {
+            console.error(e);
+            next(new restErrors.InternalServerError());
+        }
+    })
+    .catch((err) => {
+        try {
+            res.send(responseFormatter.errorResponse(err));
+        } catch (e) {
+            console.error(e);
+        } finally {
+            next(new restErrors.InternalServerError());
+        }
+    });
+};
+
+/**
+ * @param req
+ * @return [Array<Promise>]
+ */
+let getSearchRequests = function (req) {
     let providerCodes = req.params.context.provider.split(',');
     var searchRequests = [];
 
-    try {
-        providerCodes.map((code) => {
-            let provider = basicEngine.getByCode(code);
-            var providerName = (provider !== null) ? provider.directory : null;
-            var operation = operationsModule.getProviderOperation(providerName, 'flights');
-            if (operation !== null) {
-                var profileConfig = profileModule.getProviderProfile(req.userProfile, providerName);
+    providerCodes.map((code) => {
+        let providerSettings = configManager.getProviderSettingsByCode(code);
+        var providerName = (providerSettings !== null) ? providerSettings.directory : null;
+        var providerOperation = operationModule.getProviderOperation(providerName, 'flights');
+        if (providerOperation !== null) {
+            var profileConfig = profileModule.getProviderProfile(req.userProfile, providerName);
 
+            if ('execute' in providerOperation) {
                 searchRequests.push( // набираем запросы конкретных провайдеров на параллельное исполнение
-                    operation.execute(
+                    providerOperation.execute( // @todo profiling, events может быть
                         req.params.context,
                         req.params.parameters,
                         profileConfig
@@ -40,8 +71,7 @@ module.exports = (req, res, next, profileModule, operationsModule) => {
                             messages: [], // @todo messages
                             provider: code
                         }
-                    })
-                    .catch(e => { // отлов ошибок каждого запроса. засчет этого, если один из запросов фэйлится, остальные продолжат выполняться
+                    }).catch((e) => { // отлов ошибок каждого запроса. засчет этого, если один из запросов фэйлится, остальные продолжат выполняться
                         return {
                             data: [],
                             messages: [scbsMessenger.getMessage(e.stack.split("\n")[0].trim() + ' ' + e.stack.split("\n")[1].trim(), 'REQUEST')],
@@ -49,97 +79,75 @@ module.exports = (req, res, next, profileModule, operationsModule) => {
                         }
                     }),
                 );
+            } else {
+                console.log('Не найден метод execute для операции ' + providerName + '.flights');
             }
+        }
+    });
+
+    return searchRequests;
+};
+
+/**
+ * Cортируем все - код из старого wbeng
+ * @param responses
+ */
+let sortSearchResponses = function (responses)  {
+    var i,
+        codes = {},
+        returns = [],
+        messages = [],
+        localPriority = clone(defaultPriority); // @todo брать из конфига
+
+    responses.map(function (result) {
+        if (result.data !== null) {
+            result.data = result.data.filter(function (item) {
+                return item;
+            });
+        }
+        return result;
+    });
+
+    if (responses.length > 1) {
+        // проход по всем массивам с результатами от провайдеров
+        // запоминаем, какой из провайдеров, под каким индексом
+        for (i in responses) {
+            // если данные, вернувшиеся от провайдера, отсутствуют, то пропускаем
+            if (responses[i].data) {
+                codes[responses[i].provider] = i;
+                // если провайдера не было в переданном приоритете
+                // то добавим его в конец
+                if (localPriority.indexOf(responses[i].provider) < 0) {
+                    localPriority.push(responses[i].provider);
+                }
+            }
+        };
+
+        // уберём из приоритета то, что не вернулось из провайдеров
+        localPriority = localPriority.filter(function (priority) {
+            return codes.hasOwnProperty(priority);
         });
-    } catch (e) {
-        console.error(e);
-        next(e);
+
+        returns = getUniqueFlights(responses, codes, localPriority);
+    } else {
+        if (responses[0] !== undefined && responses[0].data) {
+            returns.push(responses[0].data);
+        }
     }
 
-    Promise.all(searchRequests) // разом запускаем все запросы поиска
-        .then((results) => {
-            // сортируем все - код из старого wbeng
-            try {
-                var i, j, k, l, n, o, p,
-                    codes = {},
-                    returns = [],
-                    messages = [],
-                    localPriority = clone(defaultPriority); // @todo брать из конфига
+    // форматируем вывод - код из старого wbeng
+    responses.map(function (result) {
+        messages = messages.concat(result.messages);
+    });
 
-                results.map(function (result) {
-                    if (result.data !== null) {
-                        result.data = result.data.filter(function (item) {
-                            return item;
-                        });
-                    }
-                    return result;
-                });
+    returns = {
+        data: [].concat.apply([], returns).filter(function (item) {
+            return item;
+        }),
+        messages: messages
+    };
 
-                if (searchRequests.length > 1) {
-                    // проход по всем массивам с результатами от провайдеров
-                    // запоминаем, какой из провайдеров, под каким индексом
-                    for (i = 0; i < results.length; i++) {
-
-                        // если данные, вернувшиеся от провайдера, отсутствуют, то пропускаем
-                        if ( ! results[i].data) {
-                            continue;
-                        }
-
-                        codes[results[i].provider] = i;
-                        // если провайдера не было в переданном приоритете
-                        // то добавим его в конец
-                        if (localPriority.indexOf(results[i].provider) < 0) {
-                            localPriority.push(results[i].provider);
-                        }
-                    }
-
-                    // уберём из приоритета то, что не вернулось из провайдеров
-                    localPriority = localPriority.filter(function (priority) {
-                        return codes.hasOwnProperty(priority);
-                    });
-
-                    returns = getUniqueFlights(results, codes, localPriority);
-                } else {
-                    if (results[0]  !== undefined && results[0].data) {
-                        returns.push(results[0].data);
-                    }
-                }
-
-                // форматируем вывод - код из старого wbeng
-                results.map(function (result) {
-                    messages = messages.concat(result.messages);
-                });
-
-                returns = {
-                    data: [].concat.apply([], returns).filter(function (item) {
-                        return item;
-                    }),
-                    messages: messages
-                };
-
-                let formattedResult = responseFormatter.wrapResponse(
-                    returns,
-                    operationConfig.exit,
-                    req.params.context.WBtoken,
-                    req.userProfile
-                );
-
-                res.send(formattedResult);
-                next();
-            } catch (e) {
-                console.error(e);
-                next(new restErrors.InternalServerError());
-            }
-        })
-        .catch((err) => {
-            try {
-                res.send(responseFormatter.errorResponse(err));
-            } catch (e) {
-                console.error(e);
-            } finally {
-                next(new restErrors.InternalServerError());
-            }
-        });
+    return returns;
 };
 
 let getUniqueFlights = function(results, codes, localPriority) {
