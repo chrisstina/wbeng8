@@ -1,52 +1,114 @@
-/**
- * Подготавливает ответ системы для вывода в нужном формате
- */
+const alternativeFaresAllowed = [ // выводить ли кнопку "Все тарифы"
+    { gds: 'SIRENA', carriers: ['UT', 'NN', 'WZ', 'N4', 'IK', '5N', 'Y7', 'SU', 'УТ', 'R3', '2G', 'FV', '6R'] },
+    { gds: 'SABRE', carriers: ['*'] },
+    { gds: 'GALILEO', carriers: ['*'] },
+    { gds: 'AMADEUS', carriers: ['*'] }
+];
 
 /**
- * Created by kostya on 28.07.14.
+ * Подготавливает ответ системы для вывода в нужном формате.
+ * Здесь описана сортировка, приоритеты, и прочие преобразования к финальному ответу.
  */
-var scbsMessenger = require('./scbsMessenger'),
+var sortFlights = require('./scbsFlightsSorter'),
+    scbsMessenger = require('./scbsMessenger'),
     scbsValidator = require('./scbsValidator');
 
-module.exports.wrapResponse = function (result, exitPoint, token, profile) {
-    let response = {
-        token: token,
-        messages: result.messages,
+/**
+ *
+ * @param {String} exitPoint  - flightsGroup | bookingFile
+ * @param {String} token
+ * @param {String} profile
+ * @constructor
+ */
+var ScbsResponse = function (exitPoint, token, profile) {
+    this.exitPoint = exitPoint;
+    this.token = token;
+    this.profile = profile;
+};
+
+/**
+ * Это финальная точка перед выдачей результата
+ *
+ * @return {ScbsResponse}
+ */
+ScbsResponse.prototype.wrap = function () {
+    let structuredResponse = {
+        token: this.token,
+        messages: this.rawResponse.messages,
         context: {
             version: 1,
             environment: 1,
-            profile: profile
+            profile: this.profile
         }
     };
 
-    response[exitPoint] = result.data;
-    return this.response(response);
+    structuredResponse[this.exitPoint] = this.rawResponse.data;
+    structuredResponse['profileData'] =  this.profileData;
+    this.formattedResponse = response(structuredResponse);
+    return this;
 };
 
-module.exports.request = function (parameters, entryPoint, context) {
-    switch (entryPoint) {
-        case 'book':
-            parameters = bookInput(parameters);
-            break;
-        case 'price':
-        case 'flightfares':
-            parameters = priceInput(parameters);
-            break;
-        case'ticket':
-            parameters = ticketInput(parameters);
-            break;
-        case 'cancel':
-            parameters = cancelInput(parameters);
-            break;
-        case 'fares':
-            parameters = faresInput(parameters);
-            break;
+/**
+ * @param {Array} rawResponse
+ * @return {ScbsResponse}
+ */
+ScbsResponse.prototype.setRawResponse = function (rawResponse) {
+    /** @var {Object} this.rawResponse {data: {}, messages: [], provider: '', execTime: Date } */
+    this.rawResponse = rawResponse;
+    return this;
+};
+
+ScbsResponse.prototype.setProfileData = function () {
+    this.profileData = this.rawResponse.map(function(response) {
+        if (response.execTime) {
+            let data = {};
+            data[response.provider] = response.execTime;
+            return data;
+        }
+    });
+    return this;
+};
+
+/**
+ * Получает финальный вид ответа на выдачу
+ * @return {Array}
+ */
+ScbsResponse.prototype.getFormattedResponse = function () {
+    return this.wrap().formattedResponse;
+};
+
+/**
+ * Cортируем результаты поиска.
+ * @return {ScbsResponse}
+ */
+ScbsResponse.prototype.sort = function () {
+    this.rawResponse = this.formattedResponse = sortFlights(this.rawResponse);
+    return this;
+};
+
+/**
+ * Проставляет флаг - возможен ли запрос alt fares для перелета
+ * @return {ScbsResponse}
+ */
+ScbsResponse.prototype.setAlternativeFareFlag = function () {
+    for (var resIdx in this.rawResponse.data) {
+        for (var i in this.rawResponse[resIdx]) {
+            this.rawResponse.data[resIdx][i].allowSSC =
+                isAlternativeFareAllowed(
+                    this.rawResponse.data[resIdx][i].gds,
+                    this.rawResponse.data[resIdx][i].carrier.code);
+        }
     }
 
-    return parameters;
+    return this;
 };
 
-module.exports.errorResponse = function (e) {
+/**
+ *
+ * @param {Error} e
+ * @return {ScbsResponse}
+ */
+ScbsResponse.prototype.formatErrorResponse = function (e) {
     let result = {
         messages: {
             message: []
@@ -59,10 +121,39 @@ module.exports.errorResponse = function (e) {
         result.messages.message.push(scbsMessenger.getMessage('scbsMessenger error: ' + e.stack.split("\n")[0].trim() + ' ' + e.stack.split("\n")[1].trim(), 'SCBSMESSENGER'));
     }
 
-    return result;
+    this.formattedResponse = result;
+    return this;
 };
+//
+// module.exports.request = function (parameters, entryPoint, context) { @todo перенести в другой класс
+//     switch (entryPoint) {
+//         case 'book':
+//             parameters = bookInput(parameters);
+//             break;
+//         case 'price':
+//         case 'flightfares':
+//             parameters = priceInput(parameters);
+//             break;
+//         case'ticket':
+//             parameters = ticketInput(parameters);
+//             break;
+//         case 'cancel':
+//             parameters = cancelInput(parameters);
+//             break;
+//         case 'fares':
+//             parameters = faresInput(parameters);
+//             break;
+//     }
+//
+//     return parameters;
+// };
 
-module.exports.response = function (result) {
+/**
+ * код из старой версии
+ * @param {Object} result
+ * @return {Object}
+ */
+let response = function (result) {
     result.messages = {
         message: result.messages
     };
@@ -101,6 +192,22 @@ module.exports.response = function (result) {
     }
 
     return result;
+};
+
+/**
+ *
+ * @param gds
+ * @param carrier
+ * @return {boolean}
+ */
+let isAlternativeFareAllowed = function(gds, carrier) {
+    for (var i in alternativeFaresAllowed) {
+        if (alternativeFaresAllowed[i].gds === gds) {
+            return alternativeFaresAllowed[i].carriers.indexOf('*') !== -1 ||
+                alternativeFaresAllowed[i].carriers.indexOf(carrier) !== -1
+        }
+    }
+    return false;
 };
 
 function priceInput(parameters) {
@@ -289,3 +396,5 @@ function flightGroupsOutput(flightGroup) {
     }
     return flightGroup;
 }
+
+module.exports = ScbsResponse;

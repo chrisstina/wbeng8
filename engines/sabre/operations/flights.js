@@ -19,12 +19,9 @@ var SabreFlights = function (operationEngine) {
  * @param {type} context
  * @param {type} parameters
  * @param {type} profileConfig
- * @returns {Promise}
+ * @returns {Promise<Array>}
  */
 SabreFlights.prototype.execute = function (context, parameters, profileConfig) {
-    console.info('Токен запроса %s', context.WBtoken);
-    console.time("Sabre flights executed in");
-
     var sessions = {};
     return openSession(profileConfig, parameters)
         .then((sessionToken) => {
@@ -40,11 +37,9 @@ SabreFlights.prototype.execute = function (context, parameters, profileConfig) {
                 .catch((err) => {
                     console.error('Session close error: ' + err.message);
                 }); // отправляем запрос на закрытие, и сразу возвращаем результат
-            console.timeEnd("Sabre flights executed in");
             return flightsList;
         })
         .catch((err) => {
-            console.timeEnd("Sabre flights executed in");
             throw err; // далее эта ошибка обработается в routes.js
         });
 };

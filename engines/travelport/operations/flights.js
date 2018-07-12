@@ -16,15 +16,11 @@ var TravelportFlights = function (operationEngine) {
 };
 
 TravelportFlights.prototype.execute = function (context, parameters, profileConfig) {
-    console.info('Токен запроса %s', context.WBtoken);
-    console.time("Travelport flights executed in");
-
     return getFlights(profileConfig, parameters)
         .then((flightsList) => {
             return flightsList;
         })
         .catch((err) => {
-            console.timeEnd("Travelport flights executed in");
             throw err; // далее эта ошибка обработается в routes.js
         });
 };

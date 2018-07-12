@@ -1,7 +1,7 @@
 const config = require('./../config');
 const relativeDir = '../engines';
 
-module.exports = () => {
+module.exports = (() => {
     var operations = {};
 
     return {
@@ -30,4 +30,4 @@ module.exports = () => {
                 operations[providerName][operationName] : null;
         }
     };
-}
+})();

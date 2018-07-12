@@ -20,16 +20,11 @@ var TaisFlights = function (operationEngine) {
  * @returns {Promise}
  */
 TaisFlights.prototype.execute = function (context, parameters, profileConfig) {
-    console.info('Токен запроса %s', context.WBtoken);
-    console.time("TAIS flights executed in");
-
     return getFlights(profileConfig, parameters)
         .then((flightsList) => {
-            console.timeEnd("TAIS flights executed in");
             return flightsList;
         })
         .catch((err) => {
-            console.timeEnd("TAIS flights executed in");
             throw err; // далее эта ошибка обработается в routes.js
         });
 };

@@ -18,16 +18,11 @@ var PortbiletFlights = function (operationEngine) {
  * @returns {Promise}
  */
 PortbiletFlights.prototype.execute = function (context, parameters, profileConfig) {
-    console.info('Токен запроса PB %s', context.WBtoken);
-    console.time("Portbilet flights executed in");
-
     return getFlights(profileConfig, parameters)
         .then((flightsList) => {
-            console.timeEnd("Portbilet flights executed in");
             return flightsList;
         })
         .catch((err) => {
-            console.timeEnd("Portbilet flights executed in");
             throw err; // далее эта ошибка обработается в routes.js
         });
 };
