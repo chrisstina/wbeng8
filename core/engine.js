@@ -1,4 +1,5 @@
-const rp = require('request-promise-native'),
+const scbsLog = require('./../utils/scbsLog'),
+    rp = require('request-promise-native'),
     xmljs = require('libxmljs');
 
 /**
@@ -53,7 +54,7 @@ module.exports = (() => {
                 }
             };
 
-            console.log(requestBody); // @todo вывод в файл
+            scbsLog.logRequest(profileConfig.desc, parameters.context, requestBody);
             return rp.post(requestOptions);
         },
         getNodeAttr: (node, attr, def) => {

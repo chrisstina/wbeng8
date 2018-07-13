@@ -60,6 +60,8 @@ let getSearchRequests = function (req) {
                 .then(() => beforeEachExecute(req, code))
                 .then(startTime => { // запрос провайдеру выполняется здесь
                     profileStartTime[code] = startTime;
+                    req.params.context.operationName = 'flights';
+                    req.params.parameters.context = req.params.context; // дальше в execute передаются только parameters
                     return providerOperation.execute(req.params.context, req.params.parameters, profileConfig);
                 })
                 .then(providerOperationResults => {

@@ -62,7 +62,7 @@ ScbsResponse.prototype.setProfileData = function () {
     this.profileData = this.rawResponse.map(function(response) {
         if (response.execTime) {
             let data = {};
-            data[response.provider] = response.execTime;
+            data[response.provider] = response.execTime + 'ms';
             return data;
         }
     });
