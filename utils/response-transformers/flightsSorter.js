@@ -6,10 +6,10 @@ const defaultPriority = ['DP', 'S7', 'TS', '1S', '2H', '1H', 'PB', '1G', 'TA'];/
  * Cортируем результаты поиска: если попадаются одинаковые перелеты, берем тот, который дешевле.
  * Если попадаются одинаковые перелеты и цена совпадает, смотрим на приоритет в профайле.
  * код из старого wbeng
- * @param {Object} responses
+ * @param {Array} input [{data: {}, messages: [], provider: '', execTime: Date }]
  * @return {Object}
  */
-module.exports = function(responses) {
+module.exports = function(input) {
     var i,
         codes = {},
         returns = [],
@@ -17,7 +17,7 @@ module.exports = function(responses) {
         profileData = {},
         localPriority = clone(defaultPriority); // @todo брать из конфига
 
-    responses.map(function (result) {
+    input.map(function (result) {
         if (result.data !== null) {
             result.data = result.data.filter(function (item) {
                 return item;
@@ -26,17 +26,17 @@ module.exports = function(responses) {
         return result;
     });
 
-    if (responses.length > 1) {
+    if (input.length > 1) {
         // проход по всем массивам с результатами от провайдеров
         // запоминаем, какой из провайдеров, под каким индексом
-        for (i in responses) {
+        for (i in input) {
             // если данные, вернувшиеся от провайдера, отсутствуют, то пропускаем
-            if (responses[i].data) {
-                codes[responses[i].provider] = i;
+            if (input[i].data) {
+                codes[input[i].provider] = i;
                 // если провайдера не было в переданном приоритете
                 // то добавим его в конец
-                if (localPriority.indexOf(responses[i].provider) < 0) {
-                    localPriority.push(responses[i].provider);
+                if (localPriority.indexOf(input[i].provider) < 0) {
+                    localPriority.push(input[i].provider);
                 }
             }
         };
@@ -46,15 +46,15 @@ module.exports = function(responses) {
             return codes.hasOwnProperty(priority);
         });
 
-        returns = getUniqueFlights(responses, codes, localPriority);
+        returns = getUniqueFlights(input, codes, localPriority);
     } else {
-        if (responses[0] !== undefined && responses[0].data) {
-            returns.push(responses[0].data);
+        if (input[0] !== undefined && input[0].data) {
+            returns.push(input[0].data);
         }
     }
 
     // форматируем вывод - код из старого wbeng
-    responses.map(function (result) {
+    input.map(function (result) {
         messages = messages.concat(result.messages);
     });
 

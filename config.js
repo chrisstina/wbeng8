@@ -3,6 +3,9 @@ module.exports = {
     version: '1.0.0',
     env: process.env.NODE_ENV || 'development',
     port: process.env.PORT || 3000,
+    logDirectory: 'log/providerMessages/',
+    logLocal: true, // сохранять ли файлы с xml локально
+    logRemote: false, // отправлять ли логи в wbControl
     providers: [
         {
             code: '1S',
@@ -58,11 +61,21 @@ module.exports = {
             directory: 'travelportKZ',
             engine: 'travelport'
         },
+        // {
+        //     code: '1H',
+        //     name: 'SIRENA',
+        //     directory: 'sirena',
+        //     engine: 'sirena'
+        // },
     ],
     operations: [
         {
             name: 'flights', // по этому имени ищется файл в [provider]/operations
             exit: 'flightGroups', // это поле подставляется во время форматирования ответа (legacy)
+            transformers: [ // эти методы будут применены к ответу каждого провайдера
+                'addAlternativeFareFlag', // добавляет флаг доп. тарифов
+                'addCustomTaxes', // добавляет zzTax из настроек профайла
+            ]
         },
         // {
         //     name: 'matrix',
@@ -79,6 +92,10 @@ module.exports = {
         // {
         //     name: 'price',
         //     exit: 'bookingFile',
+        //    transformers: [
+        //     'addCustomTaxes',
+        //     'convertToRUB'
+        // ]
         // },
         // {
         //     name: 'book',
@@ -104,5 +121,15 @@ module.exports = {
         //     name: 'fares',
         //     exit: 'remarkGroups',
         // },
+    ],
+    transformers: {
+        'addAlternativeFareFlag': require('./utils/response-transformers/altFaresAllower'),
+        'addCustomTaxes': require('./utils/response-transformers/customTaxModifier'),
+    },
+    alternativeFaresAllowed: [ // выводить ли кнопку "Все тарифы"
+        { gds: 'SIRENA', carriers: ['UT', 'NN', 'WZ', 'N4', 'IK', '5N', 'Y7', 'SU', 'УТ', 'R3', '2G', 'FV', '6R'] },
+        { gds: 'SABRE', carriers: ['*'] },
+        { gds: 'GALILEO', carriers: ['*'] },
+        { gds: 'AMADEUS', carriers: ['*'] }
     ]
-}
+};

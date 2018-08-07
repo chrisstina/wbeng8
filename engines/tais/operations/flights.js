@@ -1,5 +1,4 @@
 const currency = require('../../../utils/scbsCurrency'),
-    customTax = require('../../../utils/scbsCustomTax'),
     scbsKit = require('../../../utils/scbsKit'),
     tokenCrypt = require('./../../../core/tokenCrypt');
 
@@ -181,17 +180,14 @@ let parseFlightsResponse = (xmlDoc, profileConfig, parameters) => {
                 engine,
                 'flights',
                 null,
-                'TOTAL'),
-            zzTaxes = customTax.getCustomTaxes(profileConfig, totalConverted),
-            fareTotalWithZZ = customTax.getTotalWithCustomTaxes(zzTaxes, totalConverted);
+                'TOTAL');
 
         flightGroup.fares = {
             fareDesc: {},
             fareSeats: (engine.parseFares(
                 shopOption.find('SIG:FareInfo/SIG:Fares/SIG:Fare', engine.nsUri),
-                zzTaxes,
                 parameters)),
-            fareTotal: fareTotalWithZZ
+            fareTotal: totalConverted
         };
         flightGroup.untouchable = filterFlightsUntouch(gds, carrier, profileConfig);
 

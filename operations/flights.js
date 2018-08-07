@@ -6,10 +6,13 @@ const configManager = require('./../utils/configManager'),
     restErrors = require('restify-errors');
 
 const operationConfig = configManager.getOperationSettings('flights');
+const transformCallbacks = configManager.getOperationTransformCallbacks(operationConfig);
 
 module.exports = function (req, res, next) {
     // @todo если понадобится другой форматтер, можно вынести в настройки
     let scbsResponse = new ScbsResponse(operationConfig.exit, req.params.context.WBtoken, req.userProfile); // подготавливаем преобразователь ответа
+
+    console.time('[' + req.params.context.WBtoken + '] Flights total execution time');
 
     Promise.all(getSearchRequests(req)) // разом запускаем все запросы поиска
     .then((results) => {
@@ -19,11 +22,11 @@ module.exports = function (req, res, next) {
                     .setRawResponse(results)
                     .setProfileData()
                     .sort()
-                    .setAlternativeFareFlag()
                     .getFormattedResponse());
+            console.timeEnd('[' + req.params.context.WBtoken + '] Flights total execution time');
             next();
         } catch (e) {
-            console.error(e);
+            console.error(req.params.context.WBtoken, e);
             next(new restErrors.InternalServerError());
         }
     })
@@ -65,10 +68,10 @@ let getSearchRequests = function (req) {
                     return providerOperation.execute(req.params.context, req.params.parameters, profileConfig);
                 })
                 .then(providerOperationResults => {
-                    return afterEachExecute(req, code, providerOperationResults, profileStartTime[code])
+                    return afterEachExecute(req, code, profileConfig, providerOperationResults, profileStartTime[code])
                 })
                 // отлов ошибок каждого запроса. засчет этого, если один из запросов фэйлится, остальные продолжат выполняться
-                .catch(error => afterEachExecute(req, code, [], profileStartTime[code], error))
+                .catch(error => afterEachExecute(req, code, profileConfig, [], profileStartTime[code], error))
             );
         } else {
             console.log('Не найдена операция или не найден метод execute для операции ' + providerName + '.flights');
@@ -84,22 +87,26 @@ let getSearchRequests = function (req) {
  */
 let beforeEachExecute = function (req, providerCode) {
     console.info('Токен запроса %s flights %s', providerCode, req.params.context.WBtoken);
-    console.time(providerCode + " flights execution time");
+    console.time('[' + req.params.context.WBtoken + '] ' + providerCode + " flights execution time");
     return new Date();
 };
 
 /**
- * Подготавливаем каждый ответ в нужном для разбора формате
+ * Подготавливаем каждый ответ в нужном для разбора формате.
+ * Прогоняем через трансформеры, настроенные в конфиге
  * @param req
  * @param {Array} providerOperationResult - результат parse провайдера
  * @param {Date} profileStartTime
  * @param {Error|null} error
  * @return {{data: *, messages: Array, provider: String}}
  */
-let afterEachExecute = function (req, providerCode, providerOperationResult, profileStartTime, error = null) {
-    console.timeEnd(providerCode + " flights execution time");
+let afterEachExecute = function (req, providerCode, profileConfig, providerOperationResult, profileStartTime, error = null) {
+    console.timeEnd('[' + req.params.context.WBtoken + '] ' + providerCode + " flights execution time");
+
+    let transformedResult = transform(providerOperationResult, req.params, profileConfig);
+
     let response = {
-        data: providerOperationResult,
+        data: transformedResult,
         messages: [], // @todo messages
         provider: providerCode,
         execTime: new Date() - profileStartTime
@@ -110,4 +117,22 @@ let afterEachExecute = function (req, providerCode, providerOperationResult, pro
     }
 
     return response;
+};
+
+/**
+ * Прогоняет по всем трансформерам ответа, настроенным в конфиге
+ * @param {Array} providerOperationResult
+ * @param {Array} requestParams
+ * @param {Array} profileConfig
+ * @return {Array}
+ */
+let transform = function (providerOperationResult, requestParams, profileConfig) {
+
+    console.log('TRANSFORM');
+
+    var transformedResult = providerOperationResult;
+    transformCallbacks.map(function (transformCallback) {
+        transformedResult = transformCallback(transformedResult || providerOperationResult, requestParams, profileConfig);
+    });
+    return transformedResult;
 };

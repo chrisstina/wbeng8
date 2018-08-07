@@ -1,17 +1,10 @@
-const alternativeFaresAllowed = [ // выводить ли кнопку "Все тарифы"
-    { gds: 'SIRENA', carriers: ['UT', 'NN', 'WZ', 'N4', 'IK', '5N', 'Y7', 'SU', 'УТ', 'R3', '2G', 'FV', '6R'] },
-    { gds: 'SABRE', carriers: ['*'] },
-    { gds: 'GALILEO', carriers: ['*'] },
-    { gds: 'AMADEUS', carriers: ['*'] }
-];
-
 /**
  * Подготавливает ответ системы для вывода в нужном формате.
- * Здесь описана сортировка, приоритеты, и прочие преобразования к финальному ответу.
+ * Прогоняет через все методы-трансформеры, описанные в конфигурации
  */
-var sortFlights = require('./scbsFlightsSorter'),
-    scbsMessenger = require('./scbsMessenger'),
-    scbsValidator = require('./scbsValidator');
+var scbsMessenger = require('./scbsMessenger'),
+    scbsValidator = require('./scbsValidator'),
+    sortFlights = require('./response-transformers/flightsSorter');
 
 /**
  *
@@ -82,26 +75,10 @@ ScbsResponse.prototype.getFormattedResponse = function () {
  * @return {ScbsResponse}
  */
 ScbsResponse.prototype.sort = function () {
+    console.log('SORT');
     this.rawResponse = this.formattedResponse = sortFlights(this.rawResponse);
     return this;
-};
-
-/**
- * Проставляет флаг - возможен ли запрос alt fares для перелета
- * @return {ScbsResponse}
- */
-ScbsResponse.prototype.setAlternativeFareFlag = function () {
-    for (var resIdx in this.rawResponse.data) {
-        for (var i in this.rawResponse[resIdx]) {
-            this.rawResponse.data[resIdx][i].allowSSC =
-                isAlternativeFareAllowed(
-                    this.rawResponse.data[resIdx][i].gds,
-                    this.rawResponse.data[resIdx][i].carrier.code);
-        }
-    }
-
-    return this;
-};
+}
 
 /**
  *
@@ -192,22 +169,6 @@ let response = function (result) {
     }
 
     return result;
-};
-
-/**
- *
- * @param gds
- * @param carrier
- * @return {boolean}
- */
-let isAlternativeFareAllowed = function(gds, carrier) {
-    for (var i in alternativeFaresAllowed) {
-        if (alternativeFaresAllowed[i].gds === gds) {
-            return alternativeFaresAllowed[i].carriers.indexOf('*') !== -1 ||
-                alternativeFaresAllowed[i].carriers.indexOf(carrier) !== -1
-        }
-    }
-    return false;
 };
 
 function priceInput(parameters) {

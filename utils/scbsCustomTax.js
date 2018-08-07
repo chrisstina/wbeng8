@@ -37,7 +37,7 @@ var scbsCustomTax = (function() {
          * Подсчитывает общую стоимость с учетом кастомных надбавок
          * @param {Array} taxes массив надбавок вида [{code: '', value: 0},...]
          * @param {Number} totalFare
-         * @returns {undefined}
+         * @returns {Number}
          */
         getTotalWithCustomTaxes: (taxes, totalFare, seatCount) => {
             var totalWithTax = totalFare;

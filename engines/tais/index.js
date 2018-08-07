@@ -218,47 +218,47 @@ TaisEngine.prototype.parseItineraries = (itineraryOptions, sessionID, shopOption
     return itineraries;
 };
 
-let parseFares = function (Fares, zzTaxes, parameters) {
-    var Taxes, i, j, amount, code, price, Fare, responseCurrency;
-    var len = Fares.length;
+/**
+ *
+ * @param fares
+ * @param parameters
+ * @return {*}
+ */
+let parseFares = function (fares, parameters) {
+    var taxes, i, j, amount, code, price, fare, responseCurrency;
+    var len = fares.length;
     for(i = 0; i < len; i++) {
-        Fare = scbsKit.getFareSeat();
-        Fare.passengerType = this.getSystemPax(basicEngine.getNodeAttr(Fares[i].get('SIG:PaxType', nsUri), 'AgeCat'));
-        Fare.count = parseInt(basicEngine.getNodeAttr(Fares[i].get('SIG:PaxType', nsUri), 'Count'));
-        amount = (parseFloat(basicEngine.getNodeAttr(Fares[i].get('SIG:Price', nsUri), 'EquivFare'))
-            || parseFloat(basicEngine.getNodeAttr(Fares[i].get('SIG:Price', nsUri), 'BaseFare')));
-        responseCurrency = basicEngine.getNodeAttr(Fares[i].get('SIG:Price', nsUri), 'Currency')
-            || basicEngine.getNodeAttr(Fares[i].get('SIG:Price', nsUri), 'BaseCurrency');
+        fare = scbsKit.getFareSeat();
+        fare.passengerType = this.getSystemPax(basicEngine.getNodeAttr(fares[i].get('SIG:PaxType', nsUri), 'AgeCat'));
+        fare.count = parseInt(basicEngine.getNodeAttr(fares[i].get('SIG:PaxType', nsUri), 'Count'));
+        amount = (parseFloat(basicEngine.getNodeAttr(fares[i].get('SIG:Price', nsUri), 'EquivFare'))
+            || parseFloat(basicEngine.getNodeAttr(fares[i].get('SIG:Price', nsUri), 'BaseFare')));
+        responseCurrency = basicEngine.getNodeAttr(fares[i].get('SIG:Price', nsUri), 'Currency')
+            || basicEngine.getNodeAttr(fares[i].get('SIG:Price', nsUri), 'BaseCurrency');
 
-        Fare.prices[0] = scbsKit.getPrice(
+        fare.prices[0] = scbsKit.getPrice(
             'TARIFF',
             '',
             amount,
             responseCurrency,
-            parameters.currency,
-            null, // fixedRate не учитываем, т.к. здесь будут парситься только не выписанные заказы
-            this);
+            parameters.currency);  // fixedRate не учитываем, т.к. здесь будут парситься только не выписанные заказы
 
-        Taxes = Fares[i].find('SIG:Taxes/SIG:Tax', nsUri);
-        for (j = 0; j < Taxes.length; j++) {
-            amount = parseFloat(basicEngine.getNodeAttr(Taxes[j], 'Amount'));
-            code = basicEngine.getNodeAttr(Taxes[j], 'TicketCode');
+        taxes = fares[i].find('SIG:Taxes/SIG:Tax', nsUri);
+        for (j = 0; j < taxes.length; j++) {
+            amount = parseFloat(basicEngine.getNodeAttr(taxes[j], 'Amount'));
+            code = basicEngine.getNodeAttr(taxes[j], 'TicketCode');
             price = scbsKit.getPrice(
                 'TAXES',
                 code,
                 amount,
                 responseCurrency,
-                parameters.currency,
-                null, // fixedRate не учитываем, т.к. здесь будут парситься только не выписанные заказы
-                this);
-            Fare.prices.push(price);
+                parameters.currency);  // fixedRate не учитываем, т.к. здесь будут парситься только не выписанные заказы
+            fare.prices.push(price);
         }
-        for (var z in zzTaxes) {
-            Fare.prices.push(zzTaxes[z]);
-        }
-        Fares[i] = Fare;
+        fare.total = scbsKit.getFareSeatTotal(fare.prices);
+        fares[i] = fare;
     }
-    return Fares;
+    return fares;
 };
 
 let parseTicketFares = function (Ticket) {
@@ -269,7 +269,7 @@ let parseTicketFares = function (Ticket) {
     Fare.count = 1;
     amount = (parseFloat(basicEngine.getNodeAttr(Ticket.get('SIG:TicketData/SIG:Price', nsUri), 'EquivFare'))
         || parseFloat(basicEngine.getNodeAttr(Ticket.get('SIG:TicketData/SIG:Price', nsUri), 'BaseFare')));
-    Fare.prices[0] = scbsKit.getPrice('TARIFF', '', amount);
+    Fare.prices[0] = scbsKit.getPrice('TARIFF', '', amount, responseCurrency, parameters.currency);
 
     Taxes = Ticket.find('SIG:TicketData/SIG:Taxes/SIG:Tax', nsUri);
     for(j = 0; j < Taxes.length; j++) {

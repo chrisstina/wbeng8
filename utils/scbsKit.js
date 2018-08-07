@@ -232,27 +232,24 @@ var scbsKit = (function() {
 
     /**
      *
-     * @param e
-     * @param c
-     * @param a
-     * @param currencyIn
-     * @param currencyOut
-     * @param fixedRate
-     * @param provider
-     * @param operation
-     * @param pnr
+     * @param {String} elementType
+     * @param {String} code
+     * @param {Number} amount
+     * @param {String} currencyIn
+     * @param {String} currencyOut
+     * @param {Number} fixedRate
      * @returns {Object}
      */
-    scbsKit.prototype.getPrice = function(e, c, a, currencyIn, currencyOut, fixedRate, provider, operation, pnr) {
+    scbsKit.prototype.getPrice = function(elementType, code, amount, currencyIn, currencyOut, fixedRate = null) {
         let obj = new Object();
-        obj.elementType = (e === undefined) ? '' : e;
-        obj.code = (c === undefined) ? '' : c;
-        obj.amount = (a === undefined) ? '' :
+        obj.elementType = elementType || '';
+        obj.code = code || '';
+        obj.amount = (amount === undefined) ? '' :
             (currencyIn !== undefined ?
-                currency.convertAmount(a, currencyIn, currencyOut, fixedRate, provider, operation, pnr, e) : a);
+                currency.convertAmount(amount, currencyIn, currencyOut, fixedRate) : amount);
         obj.currency = currencyOut;
         obj.rate = (currencyIn === undefined) ? 1 : (fixedRate ? fixedRate : currency.getRate(currencyIn, currencyOut));
-        obj.amountBase = a;
+        obj.amountBase = amount;
         obj.currencyBase = currencyIn;
         return obj;
     };
@@ -324,6 +321,19 @@ var scbsKit = (function() {
         while(val.length < len) { val = '0' + val; }
         return val;
     };
+
+    /**
+     * Подсчитывает общую стоимость для каждого пассажира
+     *
+     * @param {Array} fareSeatPrices
+     * @return {number}
+     */
+    scbsKit.prototype.getFareSeatTotal = function (fareSeatPrices) {
+        return fareSeatPrices.reduce((accumulator, current) => {
+            return { amount: accumulator.amount + current.amount };
+        }, {amount: 0}).amount
+    };
+
     return new scbsKit();
 })();
 

@@ -284,49 +284,43 @@ var parseFlightsResponse = function (xmlDoc, profileConfig, parameters) {
             engine.code,
             'flights',
             'TOTAL'
-            ),
-            zzTaxes = customTax.getCustomTaxes(profileConfig, totalFareConverted),
-            fareTotalWithZZ = customTax.getTotalWithCustomTaxes(zzTaxes, totalFareConverted);
+        );
 
-        pricing.fares.fareTotal = fareTotalWithZZ;
+        pricing.fares.fareTotal = totalFareConverted;
 
         pricingInfos.map(function(pricingInfo){
-            let passenger = pricingInfo.find('air:PassengerType', engine.nsUri),
-                seat = {
-                    passengerType: engine.passengerClass[passenger[0].attr('Code').value()],
-                    count: passenger.length,
-                    prices: (function (pricingInfo) {
-                        let prices = [],
-                            taxes = pricingInfo.find('air:TaxInfo', engine.nsUri);
+            let passenger = pricingInfo.find('air:PassengerType', engine.nsUri);
+            let seat = scbsKit.getFareSeat();
 
-                        prices.push(scbsKit.getPrice(
-                            'TARIFF',
-                            '',
-                            engine.parsePrice(engine.getNodeAttr(pricingInfo, 'EquivalentBasePrice', 'BasePrice')),
-                            responseCurrency,
-                            parameters.currency,
-                            null,
-                            engine.code,
-                            'flights'
-                        ));
+            seat.passengerType = engine.passengerClass[passenger[0].attr('Code').value()];
+            seat.count = passenger.length;
+            seat.prices = (function (pricingInfo) {
+                let prices = [],
+                    taxes = pricingInfo.find('air:TaxInfo', engine.nsUri);
 
-                        taxes.map(function (tax) {
-                            prices.push(scbsKit.getPrice(
-                                'TAXES',
-                                engine.getNodeAttr(tax, 'Category'),
-                                engine.parsePrice(engine.getNodeAttr(tax, 'Amount')),
-                                responseCurrency,
-                                parameters.currency,
-                                null,
-                                engine.code,
-                                'flights'
-                            ));
-                        });
+                prices.push(scbsKit.getPrice(
+                    'TARIFF',
+                    '',
+                    engine.parsePrice(engine.getNodeAttr(pricingInfo, 'EquivalentBasePrice', 'BasePrice')),
+                    responseCurrency,
+                    parameters.currency
+                ));
 
-                        prices = prices.concat(zzTaxes);
-                        return prices;
-                    }(pricingInfo))
-                };
+                taxes.map(function (tax) {
+                    prices.push(scbsKit.getPrice(
+                        'TAXES',
+                        engine.getNodeAttr(tax, 'Category'),
+                        engine.parsePrice(engine.getNodeAttr(tax, 'Amount')),
+                        responseCurrency,
+                        parameters.currency
+                    ));
+                });
+
+                return prices;
+            }(pricingInfo));
+
+            seat.total = scbsKit.getFareSeatTotal(seat.prices);
+
             pricing.fares.fareSeats.push(seat);
         });
 

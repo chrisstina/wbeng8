@@ -1,6 +1,5 @@
 const clone = require('clone'),
     currency = require('../../../utils/scbsCurrency'),
-    customTax = require('../../../utils/scbsCustomTax'),
     errors = require('request-promise-native/errors'),
     scbsDate = require('../../../utils/scbsDate'),
     scbsKit = require('../../../utils/scbsKit'),
@@ -188,7 +187,7 @@ let parseFlightsResponse = function (xmlDoc, profileConfig, parameters) {
                 totalFareConverted = currency.convertAmount(
                     parseFloat(totalFare.attr('Amount').value()),
                     totalFare.attr('CurrencyCode').value(),
-                    parameters.currency,
+                    parameters.context.currency,
                     null,
                     engine,
                     'flights',
@@ -271,50 +270,38 @@ let parseFlightsResponse = function (xmlDoc, profileConfig, parameters) {
                         };
                     });
 
-                var zzTaxes = customTax.getCustomTaxes(profileConfig, totalFareConverted),
-                    fareTotalWithZZ = customTax.getTotalWithCustomTaxes(zzTaxes, totalFareConverted);
-
                 flightGroup.fares = {
                     fareDesc: {},
                     fareSeats: pricedItinerary.find('R:AirItineraryPricingInfo/R:PTC_FareBreakdowns/R:PTC_FareBreakdown', engine.nsUri)
                         .map(function (fare) {
+                            let fareSeat = scbsKit.getFareSeat();
                             let tariffSource = fare.get('R:PassengerFare/R:EquivFare', engine.nsUri) ?
                                 'EquivFare' : (fare.get('R:PassengerFare/R:BaseFare', engine.nsUri) ?
                                     'BaseFare' : null);
 
+                            fareSeat.prices = [].concat([
+                                tariffSource !== null ? scbsKit.getPrice(
+                                    'TARIFF',
+                                    '',
+                                    parseFloat(fare.get('R:PassengerFare/R:' + tariffSource, engine.nsUri).attr('Amount').value()),
+                                    fare.get('R:PassengerFare/R:' + tariffSource, engine.nsUri).attr('CurrencyCode').value(),
+                                    parameters.context.currency)
+                                    : 0
+                            ], fare.find('R:PassengerFare/R:Taxes/R:Tax', engine.nsUri).map(function (Tax) {
+                                return scbsKit.getPrice(
+                                    'TAXES',
+                                    Tax.attr('TaxCode').value(),
+                                    parseFloat(Tax.attr('Amount').value()),
+                                    Tax.attr('CurrencyCode').value(),
+                                    parameters.context.currency);
+                            }));
 
-                            return {
-                                passengerType: engine.getSeatCode(fare.get('R:PassengerTypeQuantity', engine.nsUri).attr('Code').value()),
-                                count: parseInt(fare.get('R:PassengerTypeQuantity', engine.nsUri).attr('Quantity').value()),
-                                prices: [].concat([
-                                        tariffSource !== null ? scbsKit.getPrice(
-                                            'TARIFF',
-                                            '',
-                                            parseFloat(fare.get('R:PassengerFare/R:' + tariffSource, engine.nsUri).attr('Amount').value()),
-                                            fare.get('R:PassengerFare/R:' + tariffSource, engine.nsUri).attr('CurrencyCode').value(),
-                                            parameters.currency,
-                                            null,
-                                            engine,
-                                            'flights',
-                                            null)
-                                            : 0
-                                    ], fare.find('R:PassengerFare/R:Taxes/R:Tax', engine.nsUri).map(function (Tax) {
-                                        return scbsKit.getPrice(
-                                            'TAXES',
-                                            Tax.attr('TaxCode').value(),
-                                            parseFloat(Tax.attr('Amount').value()),
-                                            Tax.attr('CurrencyCode').value(),
-                                            parameters.currency,
-                                            null,
-                                            engine,
-                                            'flights',
-                                            null);
-                                    }),
-                                    zzTaxes),
-                                fareTotal: fareTotalWithZZ
-                            };
+                            fareSeat.passengerType = engine.getSeatCode(fare.get('R:PassengerTypeQuantity', engine.nsUri).attr('Code').value());
+                            fareSeat.count = parseInt(fare.get('R:PassengerTypeQuantity', engine.nsUri).attr('Quantity').value());
+                            fareSeat.total = scbsKit.getFareSeatTotal(fareSeat.prices);
+                            return fareSeat;
                         }),
-                    fareTotal: fareTotalWithZZ
+                    fareTotal: totalFareConverted
                 };
 
                 isComplexFlight = (parameters.route.length > 2 || (parameters.route.length === 2 && parameters.route[0].locationBegin.code !== parameters.route[1].locationEnd.code)); // для проверки структуры при прайсе

@@ -16,8 +16,13 @@ const server = restify.createServer({
 server.use(restify.plugins.authorizationParser());
 server.use(restify.plugins.jsonBodyParser({mapParams: true}));
 
-server.use((req, res, next) => { // добавляем WBToken в context
+server.use((req, res, next) => { // добавляем WBToken в context и параметры для логирования
     req.params.context.WBtoken = req.id();
+
+    let clientIP = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+    var ind = clientIP.lastIndexOf(":")+1;
+    req.params.context.clientIP = clientIP.slice(ind, clientIP.length); //обрезаем мусор v6
+    req.params.context.clientLogin = req.params.context.login;
     next();
 });
 

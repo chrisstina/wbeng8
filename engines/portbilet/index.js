@@ -1,6 +1,7 @@
 const basicEngine = require('./../../core/engine'),
     customTax = require('../../utils/scbsCustomTax'),
     translit = require('transliteration.cyr'),
+    scbsKit = require('../../utils/scbsKit'),
     xmljs = require('libxmljs');
 
 const nsUri = {
@@ -172,40 +173,41 @@ PortbiletEngine.prototype.codeToPTC = function (code) {
 };
 
 PortbiletEngine.prototype.parseFares = function (priceNodes, seats, numseg, config) {
-    var fareSeatCodes = [],
+    let fareSeatCodes = [],
         fareSeats = [],
         fareTotal = 0;
 
-    for (var j = 0; j < priceNodes.length; j++) {
-        var ptc = PortbiletEngine.prototype.codeToPTC(basicEngine.getNodeText(priceNodes[j], 'passengerType'));
-        if (!fareSeatCodes.hasOwnProperty(ptc)) {
+    priceNodes.map(priceNode => {
+        var k;
+        let ptc = PortbiletEngine.prototype.codeToPTC(basicEngine.getNodeText(priceNode, 'passengerType'));
+
+        if ( ! fareSeatCodes.hasOwnProperty(ptc)) {
             k = Object.keys(fareSeatCodes).length;
             fareSeatCodes[ptc] = k;
-            fareSeats[k] = {
-                passengerType: ptc,
-                count: (function (passengerType) {
-                    for (var i = 0; i < seats.length; i++) {
-                        if (seats[i].passengerType === passengerType) {
-                            return seats[i].count;
-                        }
+
+            let seat = scbsKit.getFareSeat();
+            seat.passengerType = ptc;
+            seat.count = (passengerType => {
+                for (var i in seats) {
+                    if (seats[i].passengerType === passengerType) {
+                        return seats[i].count;
                     }
-                    return -1;
-                }(ptc)),
-                prices: []
-            };
+                }
+                return -1;
+            })(ptc);
+            fareSeats[k] = seat;
         } else {
             k = fareSeatCodes[ptc];
         }
 
         fareSeats[k].prices.push({
-            elementType: basicEngine.getNodeText(priceNodes[j], 'elementType'),
-            amount: parseInt(basicEngine.getNodeText(priceNodes[j], 'amount'))
+            elementType: basicEngine.getNodeText(priceNode, 'elementType'),
+            amount: parseInt(basicEngine.getNodeText(priceNode, 'amount'))
         });
+        fareSeats[k].total = scbsKit.getFareSeatTotal(fareSeats[k].prices);
+        fareTotal += parseInt(fareSeats[k].count) * parseInt(priceNode.get('amount').text());
+    });
 
-        fareTotal += parseInt(fareSeats[k].count) * parseInt(priceNodes[j].get('amount').text());
-    }
-
-    // ������� ����� ZZ
     if(config.addZZTax) {
         var cnt = fareSeats.length;
         var amt = 0;
@@ -222,16 +224,10 @@ PortbiletEngine.prototype.parseFares = function (priceNodes, seats, numseg, conf
         }
     }
 
-    for (var fareIdx in fareSeats) {
-        var zzTaxes = customTax.getCustomTaxes(config, fareTotal);
-        fareSeats[fareIdx].prices = fareSeats[fareIdx].prices.concat(zzTaxes);
-    }
-
-    var fareTotalWithZZ = customTax.getTotalWithCustomTaxes(zzTaxes, fareTotal, fareSeats.length);
     return {
         fareDesc: {},
         fareSeats: fareSeats,
-        fareTotal: fareTotalWithZZ
+        fareTotal: fareTotal
     };
 };
 

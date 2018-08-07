@@ -24,10 +24,8 @@ var scbsCurrency = (function() {
      * @param priceType
      * @returns {number | *}
      */
-    scbsCurrency.prototype.convertAmount = function(amount, currencyIn, currencyOut, fixedRate, provider, operation, pnr, priceType) {
+    scbsCurrency.prototype.convertAmount = function(amount, currencyIn, currencyOut, fixedRate) {
         let rate, finalAmount, isHistorical = (fixedRate !== undefined && fixedRate !== null);
-        var skipLog = (operation === 'flights' || provider === '1G' || provider === '2G' || currencyIn === 'RUB');
-
         if ( ! isHistorical || fixedRate === null) {
             rate = this.getRate(currencyIn, currencyOut);
         } else {
@@ -36,12 +34,6 @@ var scbsCurrency = (function() {
         }
 
         finalAmount = parseFloat((amount * rate).toFixed(DECIMAL_POINTS));
-
-        if ( ! skipLog) {
-            currencyLog.debug('%s %s %s converted to %s RUB, %s-RUB %s rate is %s (operation %s, provider %s, order %s, type of price: %s)',
-                priceType, amount, currencyIn, finalAmount, currencyIn, (isHistorical ? 'history' : 'current'), rate, operation, provider, pnr, priceType
-            );
-        }
         return finalAmount;
     };
 

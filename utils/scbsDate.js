@@ -5,9 +5,9 @@ var scbsDate = (function() {
          * Вернет дату в формате 2014-06-28T19:30:19+03:00
          * Учитывает переданный часовой пояс.
          *
-         * @param {type} dateString
-         * @param {type} timezone
-         * @returns {unresolved}
+         * @param {Date} dateString
+         * @param {String} timezone
+         * @returns {String}
          */
         formatISODate: (dateString, timezone) => {
             if (timezone === undefined) {
